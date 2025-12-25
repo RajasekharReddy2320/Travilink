@@ -41,7 +41,8 @@ export const ItineraryBookingDialog = ({
     phone: "",
   });
 
-  const getTransportIcon = (type: string) => {
+  const getTransportIcon = (type?: string) => {
+    if (!type) return <Plane className="h-5 w-5" />;
     const lowercaseType = type.toLowerCase();
     if (lowercaseType.includes("flight") || lowercaseType.includes("plane")) {
       return <Plane className="h-5 w-5" />;
@@ -53,7 +54,8 @@ export const ItineraryBookingDialog = ({
     return <Plane className="h-5 w-5" />;
   };
 
-  const getBookingType = (type: string): "flight" | "train" | "bus" => {
+  const getBookingType = (type?: string): "flight" | "train" | "bus" => {
+    if (!type) return "flight";
     const lowercaseType = type.toLowerCase();
     if (lowercaseType.includes("train")) return "train";
     if (lowercaseType.includes("bus")) return "bus";
