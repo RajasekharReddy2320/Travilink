@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Users, Wallet, MapPin, Loader2, X } from 'lucide-react';
+import { Calendar, Users, Wallet, MapPin, Loader2, X, Ticket, Map, Sparkles } from 'lucide-react';
 
 interface InputFormProps {
-  onSubmit: (params: TripParams) => void;
+  onSubmit: (params: TripParams & { planMode: 'tickets' | 'sightseeing' | 'full' }) => void;
   isLoading: boolean;
 }
 
@@ -26,6 +26,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
   const [travelers, setTravelers] = useState(2);
   const [budget, setBudget] = useState('Mid-Range');
   const [interests, setInterests] = useState<string[]>(['Culture', 'Food']);
+  const [planMode, setPlanMode] = useState<'tickets' | 'sightseeing' | 'full'>('full');
 
   const toggleInterest = (interest: string) => {
     setInterests(prev => 
@@ -38,11 +39,102 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentLocation || !destination || !startDate || !endDate) return;
-    onSubmit({ currentLocation, destination, startDate, endDate, travelers, budget, interests });
+    onSubmit({ currentLocation, destination, startDate, endDate, travelers, budget, interests, planMode });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl p-6 md:p-8 max-w-2xl mx-auto mb-10 shadow-sm">
+    <form onSubmit={handleSubmit} className="bg-card border border-border rounded-3xl p-6 md:p-8 max-w-2xl mx-auto mb-10 shadow-lg">
+      {/* Planning Mode Selection */}
+      <div className="mb-8">
+        <Label className="text-sm font-semibold text-foreground mb-3 block">
+          What do you want to plan?
+        </Label>
+        <div className="grid grid-cols-3 gap-3">
+          <button
+            type="button"
+            onClick={() => setPlanMode('tickets')}
+            className={`
+              relative p-4 rounded-2xl border-2 transition-all duration-300
+              ${planMode === 'tickets' 
+                ? 'border-primary bg-primary/10 shadow-lg shadow-primary/20' 
+                : 'border-border hover:border-muted-foreground/50 bg-card'
+              }
+            `}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <div className={`p-3 rounded-xl ${planMode === 'tickets' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                <Ticket className="h-6 w-6" />
+              </div>
+              <span className="font-semibold text-sm">Tickets Only</span>
+              <span className="text-xs text-muted-foreground text-center">Budget optimized travel</span>
+            </div>
+            {planMode === 'tickets' && (
+              <div className="absolute -top-2 -right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                <span className="text-primary-foreground text-xs">✓</span>
+              </div>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPlanMode('sightseeing')}
+            className={`
+              relative p-4 rounded-2xl border-2 transition-all duration-300
+              ${planMode === 'sightseeing' 
+                ? 'border-accent bg-accent/10 shadow-lg shadow-accent/20' 
+                : 'border-border hover:border-muted-foreground/50 bg-card'
+              }
+            `}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <div className={`p-3 rounded-xl ${planMode === 'sightseeing' ? 'bg-accent text-accent-foreground' : 'bg-muted'}`}>
+                <Map className="h-6 w-6" />
+              </div>
+              <span className="font-semibold text-sm">Sightseeing</span>
+              <span className="text-xs text-muted-foreground text-center">Plan activities only</span>
+            </div>
+            {planMode === 'sightseeing' && (
+              <div className="absolute -top-2 -right-2 w-5 h-5 bg-accent rounded-full flex items-center justify-center">
+                <span className="text-accent-foreground text-xs">✓</span>
+              </div>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPlanMode('full')}
+            className={`
+              relative p-4 rounded-2xl border-2 transition-all duration-300
+              ${planMode === 'full' 
+                ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/20' 
+                : 'border-border hover:border-muted-foreground/50 bg-card'
+              }
+            `}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <div className={`p-3 rounded-xl ${planMode === 'full' ? 'bg-green-500 text-white' : 'bg-muted'}`}>
+                <Sparkles className="h-6 w-6" />
+              </div>
+              <span className="font-semibold text-sm">Complete Trip</span>
+              <span className="text-xs text-muted-foreground text-center">Tickets + Activities</span>
+            </div>
+            {planMode === 'full' && (
+              <div className="absolute -top-2 -right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs">✓</span>
+              </div>
+            )}
+          </button>
+        </div>
+        
+        {planMode === 'tickets' && (
+          <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">💡 Smart Routing:</span> We'll find the best combination of flights, trains, and buses with optimal pricing. If direct travel isn't available, we'll show multi-leg options.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Current Location */}
       <div className="mb-6">
         <Label className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
@@ -54,7 +146,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
           placeholder="e.g., Mumbai, India"
           value={currentLocation}
           onChange={(e) => setCurrentLocation(e.target.value)}
-          className="bg-background"
+          className="bg-background rounded-xl"
           required
         />
       </div>
@@ -70,7 +162,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
           placeholder="e.g., Paris, France"
           value={destination}
           onChange={(e) => setDestination(e.target.value)}
-          className="bg-background"
+          className="bg-background rounded-xl"
           required
         />
       </div>
@@ -86,7 +178,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="bg-background"
+            className="bg-background rounded-xl"
             required
           />
         </div>
@@ -99,7 +191,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="bg-background"
+            className="bg-background rounded-xl"
             required
           />
         </div>
@@ -115,16 +207,18 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="icon"
+            className="rounded-xl"
             onClick={() => setTravelers(Math.max(1, travelers - 1))}
           >
             -
           </Button>
-          <span className="text-lg font-bold w-8 text-center">{travelers}</span>
+          <span className="text-xl font-bold w-10 text-center">{travelers}</span>
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="icon"
+            className="rounded-xl"
             onClick={() => setTravelers(travelers + 1)}
           >
             +
@@ -145,6 +239,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
               type="button"
               variant={budget === option ? "default" : "outline"}
               size="sm"
+              className="rounded-xl"
               onClick={() => setBudget(option)}
             >
               {option}
@@ -153,40 +248,41 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
         </div>
       </div>
 
-      {/* Interests */}
-      <div className="mb-8">
-        <Label className="text-sm font-semibold text-foreground mb-3 block">
-          Interests
-        </Label>
-        <div className="flex flex-wrap gap-2">
-          {interestOptions.map((interest) => (
-            <Badge
-              key={interest}
-              variant={interests.includes(interest) ? "default" : "outline"}
-              className="cursor-pointer transition-all hover:scale-105"
-              onClick={() => toggleInterest(interest)}
-            >
-              {interest}
-              {interests.includes(interest) && <X size={12} className="ml-1" />}
-            </Badge>
-          ))}
+      {/* Interests - Only show for sightseeing or full mode */}
+      {(planMode === 'sightseeing' || planMode === 'full') && (
+        <div className="mb-8">
+          <Label className="text-sm font-semibold text-foreground mb-3 block">
+            Interests
+          </Label>
+          <div className="flex flex-wrap gap-2">
+            {interestOptions.map((interest) => (
+              <Badge
+                key={interest}
+                variant={interests.includes(interest) ? "default" : "outline"}
+                className="cursor-pointer transition-all hover:scale-105 rounded-full px-4 py-1"
+                onClick={() => toggleInterest(interest)}
+              >
+                {interest}
+                {interests.includes(interest) && <X size={12} className="ml-1" />}
+              </Badge>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Submit */}
       <Button
         type="submit"
         disabled={isLoading || !currentLocation || !destination || !startDate || !endDate}
-        className="w-full py-6 text-lg font-bold"
+        className="w-full py-6 text-lg font-bold rounded-2xl"
         size="lg"
       >
         {isLoading ? (
-          <>
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            Generating Your Trip...
-          </>
+          <Loader2 className="h-5 w-5 animate-spin" />
         ) : (
-          'Plan My Trip'
+          <>
+            {planMode === 'tickets' ? 'Find Best Tickets' : planMode === 'sightseeing' ? 'Plan Activities' : 'Plan My Trip'}
+          </>
         )}
       </Button>
     </form>

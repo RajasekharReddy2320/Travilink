@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket } from "lucide-react";
+import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight } from "lucide-react";
 import DashboardNav from "@/components/DashboardNav";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -70,6 +70,8 @@ const Profile = () => {
   const [userLikes, setUserLikes] = useState<Set<string>>(new Set());
   const [userSaves, setUserSaves] = useState<Set<string>>(new Set());
   const [userGroupMemberships, setUserGroupMemberships] = useState<Set<string>>(new Set());
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   useEffect(() => {
     checkAuth();
@@ -91,10 +93,20 @@ const Profile = () => {
     await loadProfile(targetUserId);
     await loadUserActivity(targetUserId);
     await loadSocialActivity(targetUserId, session.user.id);
+    await loadFollowCounts(targetUserId);
     
     if (!isOwn) {
       await loadConnectionStatus(session.user.id, targetUserId);
     }
+  };
+
+  const loadFollowCounts = async (targetUserId: string) => {
+    const [followersRes, followingRes] = await Promise.all([
+      supabase.from("user_follows").select("*", { count: "exact", head: true }).eq("following_id", targetUserId),
+      supabase.from("user_follows").select("*", { count: "exact", head: true }).eq("follower_id", targetUserId),
+    ]);
+    setFollowersCount(followersRes.count || 0);
+    setFollowingCount(followingRes.count || 0);
   };
 
   const loadConnectionStatus = async (currentId: string, targetId: string) => {
@@ -106,7 +118,6 @@ const Profile = () => {
     const status = data || 'none';
     setConnectionStatus(status);
 
-    // Check if user can message
     const { data: targetProfile } = await supabase
       .from("profiles")
       .select("is_public")
@@ -133,7 +144,6 @@ const Profile = () => {
       return;
     }
 
-    // If profile doesn't exist, create one
     if (!data && isOwnProfile) {
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -184,33 +194,24 @@ const Profile = () => {
   };
 
   const loadUserActivity = async (targetUserId: string) => {
-    // Load liked trips
     const { data: likes } = await supabase
       .from("trip_likes")
-      .select(`
-        trip_id,
-        trips:trip_id (*)
-      `)
+      .select(`trip_id, trips:trip_id (*)`)
       .eq("user_id", targetUserId);
 
     if (likes) {
       setLikedTrips(likes.map(l => l.trips).filter(Boolean));
     }
 
-    // Load bucket list
     const { data: bucket } = await supabase
       .from("bucket_list")
-      .select(`
-        trip_id,
-        trips:trip_id (*)
-      `)
+      .select(`trip_id, trips:trip_id (*)`)
       .eq("user_id", targetUserId);
 
     if (bucket) {
       setBucketList(bucket.map(b => b.trips).filter(Boolean));
     }
 
-    // Load user's trips
     const { data: trips } = await supabase
       .from("trips")
       .select("*")
@@ -223,16 +224,9 @@ const Profile = () => {
   };
 
   const loadSocialActivity = async (targetUserId: string, currentId: string) => {
-    // Load user's posts
     const { data: posts } = await supabase
       .from("posts")
-      .select(`
-        *,
-        profiles:user_id (
-          full_name,
-          avatar_url
-        )
-      `)
+      .select(`*, profiles:user_id (full_name, avatar_url)`)
       .eq("user_id", targetUserId)
       .order("created_at", { ascending: false });
 
@@ -240,16 +234,9 @@ const Profile = () => {
       setUserPosts(posts);
     }
 
-    // Load user's travel groups (created)
     const { data: groups } = await supabase
       .from("travel_groups")
-      .select(`
-        *,
-        profiles:creator_id (
-          full_name,
-          avatar_url
-        )
-      `)
+      .select(`*, profiles:creator_id (full_name, avatar_url)`)
       .eq("creator_id", targetUserId)
       .order("created_at", { ascending: false });
 
@@ -268,7 +255,6 @@ const Profile = () => {
       setUserGroups(groupsWithCounts);
     }
 
-    // Load user's bookings
     const { data: bookings } = await supabase
       .from("bookings")
       .select("*")
@@ -279,7 +265,6 @@ const Profile = () => {
       setUserBookings(bookings);
     }
 
-    // Load current user's interactions
     if (currentId) {
       const [likesData, savesData, membershipsData] = await Promise.all([
         supabase.from("post_likes").select("post_id").eq("user_id", currentId),
@@ -355,7 +340,6 @@ const Profile = () => {
     if (!profile) return;
 
     if (connectionStatus === 'none') {
-      // Send connection request
       const { error } = await supabase
         .from("user_connections")
         .insert({
@@ -380,7 +364,6 @@ const Profile = () => {
       
       await loadConnectionStatus(currentUserId, profile.id);
     } else if (connectionStatus === 'pending_sent') {
-      // Cancel request
       const { error } = await supabase
         .from("user_connections")
         .delete()
@@ -404,7 +387,6 @@ const Profile = () => {
       
       await loadConnectionStatus(currentUserId, profile.id);
     } else if (connectionStatus === 'connected') {
-      // Remove connection
       const { error } = await supabase
         .from("user_connections")
         .delete()
@@ -464,7 +446,6 @@ const Profile = () => {
         description: "Your review has been submitted successfully.",
       });
 
-      // Reset form
       setRating(0);
       setReviewText("");
     } catch (error) {
@@ -504,473 +485,369 @@ const Profile = () => {
     <div className="min-h-screen bg-background">
       <DashboardNav />
 
-      <main className="container px-4 py-8 max-w-4xl">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">{isOwnProfile ? "My Profile" : "Profile"}</h1>
-          {isOwnProfile && (
-            <Button variant="outline" onClick={handleLogout}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
-          )}
+      <main className="max-w-4xl mx-auto pb-20">
+        {/* Instagram-style Profile Header */}
+        <div className="relative">
+          {/* Cover/Gradient Background */}
+          <div className="h-32 md:h-48 bg-gradient-to-r from-primary/30 via-accent/20 to-secondary/30 rounded-b-3xl" />
+          
+          {/* Profile Info Section */}
+          <div className="px-4 md:px-8 -mt-16 md:-mt-20">
+            <div className="flex flex-col md:flex-row items-center md:items-end gap-4 md:gap-8">
+              {/* Avatar */}
+              <div className="relative">
+                <Avatar className="h-28 w-28 md:h-36 md:w-36 ring-4 ring-background shadow-xl">
+                  <AvatarImage src={profile.avatar_url || undefined} />
+                  <AvatarFallback className="text-3xl md:text-4xl bg-gradient-to-br from-primary to-accent text-primary-foreground">
+                    {getInitials(profile.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+                {isOwnProfile && (
+                  <button className="absolute bottom-1 right-1 p-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 transition-transform">
+                    <Camera className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Stats & Actions */}
+              <div className="flex-1 w-full text-center md:text-left">
+                <div className="flex flex-col md:flex-row items-center gap-4 mb-4">
+                  <h1 className="text-2xl md:text-3xl font-bold">{profile.full_name || "Traveler"}</h1>
+                  {isOwnProfile ? (
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setEditing(!editing)}>
+                        {editing ? "Cancel" : "Edit Profile"}
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={handleLogout}>
+                        <LogOut className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      {connectionStatus === 'none' && (
+                        <Button size="sm" onClick={handleConnectionAction}>
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Follow
+                        </Button>
+                      )}
+                      {connectionStatus === 'pending_sent' && (
+                        <Button variant="outline" size="sm" onClick={handleConnectionAction}>
+                          Requested
+                        </Button>
+                      )}
+                      {connectionStatus === 'connected' && (
+                        <Button variant="secondary" size="sm" onClick={handleConnectionAction}>
+                          <UserCheck className="mr-1 h-4 w-4" />
+                          Following
+                        </Button>
+                      )}
+                      {canMessage && (
+                        <Button variant="outline" size="sm" onClick={() => navigate('/wanderlust', { state: { selectedUserId: profile.id } })}>
+                          <MessageCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Stats Row */}
+                <div className="flex justify-center md:justify-start gap-8 mb-4">
+                  <div className="text-center">
+                    <span className="text-xl font-bold">{userPosts.length}</span>
+                    <p className="text-sm text-muted-foreground">Posts</p>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-xl font-bold">{followersCount}</span>
+                    <p className="text-sm text-muted-foreground">Followers</p>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-xl font-bold">{followingCount}</span>
+                    <p className="text-sm text-muted-foreground">Following</p>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-xl font-bold">{userTrips.length}</span>
+                    <p className="text-sm text-muted-foreground">Trips</p>
+                  </div>
+                </div>
+
+                {/* Bio */}
+                {profile.bio && (
+                  <p className="text-muted-foreground max-w-lg">{profile.bio}</p>
+                )}
+                {profile.home_location && (
+                  <div className="flex items-center justify-center md:justify-start gap-1 mt-2 text-sm text-muted-foreground">
+                    <MapPin className="h-3 w-3" />
+                    {profile.home_location}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Profile Header */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-6">
-              <Avatar className="h-24 w-24">
-                <AvatarImage src={profile.avatar_url || undefined} />
-                <AvatarFallback className="text-2xl">{getInitials(profile.full_name)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold mb-1">{profile.full_name || "User"}</h2>
-                {isOwnProfile && (
-                  <>
-                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                      <Mail className="h-4 w-4" />
-                      {profile.email}
+        {/* Quick Access Cards - Photo Vault & Knowledge Base */}
+        {isOwnProfile && (
+          <div className="px-4 md:px-8 mt-8">
+            <div className="grid grid-cols-2 gap-4">
+              <Link to="/photo-vault" className="group">
+                <Card className="overflow-hidden hover:shadow-lg transition-all border-0 bg-gradient-to-br from-pink-500/10 via-rose-500/5 to-orange-500/10 hover:scale-[1.02]">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-pink-500 to-orange-500 text-white shadow-lg">
+                      <Camera className="h-6 w-6" />
                     </div>
-                    {profile.phone && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Phone className="h-4 w-4" />
-                        {profile.phone}
+                    <div className="flex-1">
+                      <h3 className="font-semibold group-hover:text-primary transition-colors">Photo Vault</h3>
+                      <p className="text-xs text-muted-foreground">Your travel memories</p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                  </CardContent>
+                </Card>
+              </Link>
+              <Link to="/knowledge" className="group">
+                <Card className="overflow-hidden hover:shadow-lg transition-all border-0 bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-violet-500/10 hover:scale-[1.02]">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-violet-500 text-white shadow-lg">
+                      <BookOpen className="h-6 w-6" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold group-hover:text-primary transition-colors">Knowledge Base</h3>
+                      <p className="text-xs text-muted-foreground">Journals & experiences</p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Content Tabs */}
+        <div className="px-4 md:px-8 mt-8">
+          <Tabs defaultValue="posts" className="w-full">
+            <TabsList className="w-full grid grid-cols-4 bg-muted/50 rounded-xl p-1">
+              <TabsTrigger value="posts" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                <Grid3X3 className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Posts</span>
+              </TabsTrigger>
+              <TabsTrigger value="trips" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                <Globe className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Trips</span>
+              </TabsTrigger>
+              <TabsTrigger value="groups" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                <UsersIcon className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Groups</span>
+              </TabsTrigger>
+              <TabsTrigger value="bookings" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                <Ticket className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Tickets</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="posts" className="mt-6">
+              {userPosts.length === 0 ? (
+                <div className="text-center py-16 bg-muted/30 rounded-2xl">
+                  <Camera className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="font-semibold text-lg mb-1">No posts yet</h3>
+                  <p className="text-muted-foreground text-sm">Share your travel adventures!</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-1 md:gap-3">
+                  {userPosts.map((post) => (
+                    <div key={post.id} className="aspect-square rounded-lg overflow-hidden bg-muted relative group cursor-pointer">
+                      {post.image_url ? (
+                        <img src={post.image_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20 p-4">
+                          <p className="text-xs text-center line-clamp-4">{post.content}</p>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white">
+                        <span className="flex items-center gap-1">❤️ {post.likes_count || 0}</span>
+                        <span className="flex items-center gap-1">💬 {post.comments_count || 0}</span>
                       </div>
-                    )}
-                  </>
-                )}
-                {!isOwnProfile && connectionStatus !== 'connected' && (
-                  <p className="text-sm text-muted-foreground">
-                    Connect to view profile details
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-2">
-                {!isOwnProfile && (
-                  <>
-                    {connectionStatus === 'none' && (
-                      <Button onClick={handleConnectionAction}>
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Connect
-                      </Button>
-                    )}
-                    {connectionStatus === 'pending_sent' && (
-                      <Button variant="outline" onClick={handleConnectionAction}>
-                        <X className="mr-2 h-4 w-4" />
-                        Cancel Request
-                      </Button>
-                    )}
-                    {connectionStatus === 'pending_received' && (
-                      <Button onClick={() => navigate('/connections')}>
-                        View Request
-                      </Button>
-                    )}
-                    {connectionStatus === 'connected' && (
-                      <>
-                        <Badge variant="secondary" className="flex items-center gap-1 px-3 py-1">
-                          <UserCheck className="h-4 w-4" />
-                          Connected
-                        </Badge>
-                        <Button variant="ghost" size="icon" onClick={handleConnectionAction}>
-                          <UserMinus className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                    {canMessage && (
-                      <Button onClick={() => navigate('/wanderlust', { state: { selectedUserId: profile.id } })}>
-                        <MessageCircle className="mr-2 h-4 w-4" />
-                        Message
-                      </Button>
-                    )}
-                  </>
-                )}
-                {isOwnProfile && (
-                  <Button onClick={() => setEditing(!editing)}>
-                    {editing ? "Cancel" : "Edit Profile"}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
 
-        {/* Profile Details - Only show if own profile or connected */}
-        {(isOwnProfile || connectionStatus === 'connected') && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Personal Information</CardTitle>
-              <CardDescription>
-                {isOwnProfile ? "Your personal details and preferences" : `${profile.full_name || "User"}'s profile`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="full_name">Full Name</Label>
-              <Input
-                id="full_name"
-                value={profile.full_name || ""}
-                onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
-                disabled={!editing}
-              />
-            </div>
+            <TabsContent value="trips" className="mt-6 space-y-4">
+              {userTrips.length === 0 ? (
+                <div className="text-center py-16 bg-muted/30 rounded-2xl">
+                  <Globe className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="font-semibold text-lg mb-1">No trips yet</h3>
+                  <p className="text-muted-foreground text-sm mb-4">Start planning your next adventure!</p>
+                  <Button onClick={() => navigate("/ai-planner")}>Plan a Trip</Button>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {userTrips.map((trip) => (
+                    <Card key={trip.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                      {trip.image_url && (
+                        <img src={trip.image_url} alt={trip.title} className="w-full h-40 object-cover" />
+                      )}
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg">{trip.title}</CardTitle>
+                        <CardDescription>{trip.destination}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          {new Date(trip.start_date).toLocaleDateString()} - {new Date(trip.end_date).toLocaleDateString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
 
-            <div>
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                value={profile.phone || ""}
-                onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                disabled={!editing}
-                placeholder="Add phone number"
-              />
-            </div>
+            <TabsContent value="groups" className="mt-6 space-y-4">
+              {userGroups.length === 0 ? (
+                <div className="text-center py-16 bg-muted/30 rounded-2xl">
+                  <UsersIcon className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="font-semibold text-lg mb-1">No groups yet</h3>
+                  <p className="text-muted-foreground text-sm">Create or join travel groups!</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {userGroups.map((group) => (
+                    <TravelGroupCard
+                      key={group.id}
+                      group={group}
+                      currentUserId={currentUserId}
+                      isMember={userGroupMemberships.has(group.id)}
+                      onUpdate={handleGroupUpdate}
+                    />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
 
-            <div>
-              <Label htmlFor="bio">Bio</Label>
-              <Textarea
-                id="bio"
-                value={profile.bio || ""}
-                onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-                disabled={!editing}
-                placeholder="Tell us about yourself"
-                rows={4}
-              />
-            </div>
+            <TabsContent value="bookings" className="mt-6 space-y-4">
+              {userBookings.length === 0 ? (
+                <div className="text-center py-16 bg-muted/30 rounded-2xl">
+                  <Ticket className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="font-semibold text-lg mb-1">No bookings yet</h3>
+                  <p className="text-muted-foreground text-sm mb-4">Book your first trip!</p>
+                  <Button onClick={() => navigate("/book")}>Book Now</Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {userBookings.map((booking) => (
+                    <Card key={booking.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="p-3 rounded-xl bg-primary/10">
+                              <Ticket className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold">{booking.from_location} → {booking.to_location}</h4>
+                              <p className="text-sm text-muted-foreground capitalize">{booking.booking_type} • {booking.service_name}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant={booking.status === "confirmed" ? "default" : "secondary"}>
+                              {booking.status}
+                            </Badge>
+                            <p className="text-sm font-semibold text-primary mt-1">₹{parseFloat(booking.price_inr).toLocaleString("en-IN")}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="age">Age</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  value={profile.age || ""}
-                  onChange={(e) => setProfile({ ...profile, age: parseInt(e.target.value) || null })}
-                  disabled={!editing}
-                  placeholder="Add age"
-                />
-              </div>
+        {/* Edit Profile Section */}
+        {isOwnProfile && editing && (
+          <div className="px-4 md:px-8 mt-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Edit Profile</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="full_name">Full Name</Label>
+                    <Input
+                      id="full_name"
+                      value={profile.full_name || ""}
+                      onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      value={profile.phone || ""}
+                      onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                    />
+                  </div>
+                </div>
 
-              <div>
-                <Label htmlFor="gender">Gender</Label>
-                <Input
-                  id="gender"
-                  value={profile.gender || ""}
-                  onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
-                  disabled={!editing}
-                  placeholder="Add gender"
-                />
-              </div>
-            </div>
+                <div>
+                  <Label htmlFor="bio">Bio</Label>
+                  <Textarea
+                    id="bio"
+                    value={profile.bio || ""}
+                    onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+                    rows={3}
+                  />
+                </div>
 
-            <div>
-              <Label htmlFor="dob">Date of Birth</Label>
-              <Input
-                id="dob"
-                type="date"
-                value={profile.date_of_birth || ""}
-                onChange={(e) => setProfile({ ...profile, date_of_birth: e.target.value })}
-                disabled={!editing}
-              />
-            </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="home_location">Location</Label>
+                    <Input
+                      id="home_location"
+                      value={profile.home_location || ""}
+                      onChange={(e) => setProfile({ ...profile, home_location: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="country">Country</Label>
+                    <Input
+                      id="country"
+                      value={profile.country || ""}
+                      onChange={(e) => setProfile({ ...profile, country: e.target.value })}
+                    />
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="country">Country</Label>
-                <Input
-                  id="country"
-                  value={profile.country || ""}
-                  onChange={(e) => setProfile({ ...profile, country: e.target.value })}
-                  disabled={!editing}
-                  placeholder="Add country"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="state">State</Label>
-                <Input
-                  id="state"
-                  value={profile.state || ""}
-                  onChange={(e) => setProfile({ ...profile, state: e.target.value })}
-                  disabled={!editing}
-                  placeholder="Add state"
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="home_location">Home Location</Label>
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="home_location"
-                  value={profile.home_location || ""}
-                  onChange={(e) => setProfile({ ...profile, home_location: e.target.value })}
-                  disabled={!editing}
-                  placeholder="Add home location"
-                  className="flex-1"
-                />
-              </div>
-            </div>
-
-            {editing && (
-              <div className="pt-4">
-                <Button onClick={handleSave} className="w-full">
-                  Save Changes
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                <div className="flex items-center justify-between pt-4">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={profile.is_public}
+                      onCheckedChange={(checked) => setProfile({ ...profile, is_public: checked })}
+                    />
+                    <Label>Public Profile</Label>
+                  </div>
+                  <Button onClick={handleSave}>Save Changes</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
-        {/* Privacy Settings */}
+        {/* Review Section */}
         {isOwnProfile && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {profile.is_public ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
-                Privacy Settings
-              </CardTitle>
-              <CardDescription>
-                Control who can view your profile and message you
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="privacy-toggle" className="text-base">
-                    Public Profile
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    {profile.is_public 
-                      ? "Anyone can view your profile and send you messages" 
-                      : "Only connected users can view your full profile and message you"}
-                  </p>
-                </div>
-                <Switch
-                  id="privacy-toggle"
-                  checked={profile.is_public}
-                  onCheckedChange={(checked) => setProfile({ ...profile, is_public: checked })}
-                  disabled={!editing}
-                />
-              </div>
-              
-              {!profile.is_public && (
-                <div className="rounded-lg bg-muted p-4">
-                  <h4 className="font-medium mb-2 flex items-center gap-2">
-                    <Lock className="h-4 w-4" />
-                    Private Profile Features
-                  </h4>
-                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                    <li>Only connected users can see your full profile</li>
-                    <li>Others can only see your name and profile picture</li>
-                    <li>Only connected users can message you</li>
-                    <li>You appear in search with limited information</li>
-                  </ul>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Languages - Only show if own profile or connected */}
-        {(isOwnProfile || connectionStatus === 'connected') && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="h-5 w-5" />
-                Languages Spoken
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {profile.languages_spoken && profile.languages_spoken.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {profile.languages_spoken.map((lang) => (
-                    <Badge key={lang} variant="secondary">{lang}</Badge>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">No languages added yet</p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Interests - Only show if own profile or connected */}
-        {(isOwnProfile || connectionStatus === 'connected') && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Travel Interests</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {profile.interests && profile.interests.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {profile.interests.map((interest) => (
-                    <Badge key={interest} variant="outline">{interest}</Badge>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">No interests added yet</p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Travel Preferences - Only show if own profile or connected */}
-        {(isOwnProfile || connectionStatus === 'connected') && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Travel Preferences</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {profile.travel_preferences && profile.travel_preferences.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {profile.travel_preferences.map((pref) => (
-                    <Badge key={pref}>{pref}</Badge>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">No preferences added yet</p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Social Activity Section - Only show if own profile or connected */}
-        {(isOwnProfile || connectionStatus === 'connected') && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>{isOwnProfile ? "My Activity" : "Activity"}</CardTitle>
-              <CardDescription>
-                {isOwnProfile ? "Your posts, groups, and travel history" : `${profile.full_name}'s activity`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="posts" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="posts" className="gap-2">
-                    <FileText className="h-4 w-4" />
-                    Posts ({userPosts.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="groups" className="gap-2">
-                    <UsersIcon className="h-4 w-4" />
-                    Groups ({userGroups.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="bookings" className="gap-2">
-                    <Ticket className="h-4 w-4" />
-                    Travel History ({userBookings.length})
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="posts" className="space-y-4 mt-4">
-                  {userPosts.length === 0 ? (
-                    <div className="text-center py-8">
-                      <FileText className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-muted-foreground">No posts yet</p>
-                    </div>
-                  ) : (
-                    userPosts.map((post) => (
-                      <PostCard
-                        key={post.id}
-                        post={post}
-                        currentUserId={currentUserId}
-                        userLiked={userLikes.has(post.id)}
-                        userSaved={userSaves.has(post.id)}
-                        onUpdate={handlePostUpdate}
-                      />
-                    ))
-                  )}
-                </TabsContent>
-
-                <TabsContent value="groups" className="space-y-4 mt-4">
-                  {userGroups.length === 0 ? (
-                    <div className="text-center py-8">
-                      <UsersIcon className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-muted-foreground">No travel groups created yet</p>
-                    </div>
-                  ) : (
-                    <div className="grid md:grid-cols-2 gap-4">
-                      {userGroups.map((group) => (
-                        <TravelGroupCard
-                          key={group.id}
-                          group={group}
-                          currentUserId={currentUserId}
-                          isMember={userGroupMemberships.has(group.id)}
-                          onUpdate={handleGroupUpdate}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="bookings" className="space-y-4 mt-4">
-                  {userBookings.length === 0 ? (
-                    <div className="text-center py-8">
-                      <Ticket className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-muted-foreground">No travel history yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {userBookings.map((booking) => (
-                        <Card key={booking.id}>
-                          <CardHeader className="pb-3">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <CardTitle className="text-base">
-                                  {booking.from_location} → {booking.to_location}
-                                </CardTitle>
-                                <CardDescription className="capitalize">
-                                  {booking.booking_type} • {booking.service_name}
-                                </CardDescription>
-                              </div>
-                              <Badge variant={booking.status === "confirmed" ? "default" : "secondary"}>
-                                {booking.status}
-                              </Badge>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-2 text-sm">
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4 text-muted-foreground" />
-                              <span>
-                                {new Date(booking.departure_date).toLocaleDateString()} at{" "}
-                                {booking.departure_time}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-muted-foreground" />
-                              <span>{booking.passenger_name}</span>
-                            </div>
-                            <div className="font-semibold text-primary">
-                              ₹{parseFloat(booking.price_inr).toLocaleString("en-IN")}
-                            </div>
-                            {booking.booking_reference && (
-                              <div className="text-xs text-muted-foreground">
-                                Ref: {booking.booking_reference}
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* App Review Section - Only for own profile */}
-        {isOwnProfile && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Share Your Experience</CardTitle>
-              <CardDescription>
-                Travexa is currently in the development stage. Help us improve by sharing your feedback. Your review is private and will only be seen by our team. Would you use Travexa if it were fully functional?
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label>How would you rate your experience? *</Label>
+          <div className="px-4 md:px-8 mt-8">
+            <Card className="bg-gradient-to-br from-accent/5 to-primary/5 border-0">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-accent" />
+                  Share Your Experience
+                </CardTitle>
+                <CardDescription>
+                  Help us improve Travexa with your feedback
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="flex gap-2">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -991,36 +868,22 @@ const Profile = () => {
                     </button>
                   ))}
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="reviewText">Your Review *</Label>
                 <Textarea
-                  id="reviewText"
-                  placeholder="Tell us about your experience with Travexa... What do you like? What could be improved?"
+                  placeholder="Tell us about your experience..."
                   value={reviewText}
                   onChange={(e) => setReviewText(e.target.value)}
-                  rows={5}
-                  maxLength={1000}
+                  rows={4}
                 />
-                <p className="text-xs text-muted-foreground text-right">
-                  {reviewText.length}/1000 characters
-                </p>
-              </div>
-
-              <Button
-                onClick={handleSubmitReview}
-                disabled={isSubmittingReview || rating === 0 || reviewText.length < 10}
-                className="w-full"
-              >
-                {isSubmittingReview ? "Submitting..." : "Submit Review"}
-              </Button>
-
-              <p className="text-xs text-muted-foreground text-center">
-                Your review is confidential and will only be viewed by the Travexa team to improve the app.
-              </p>
-            </CardContent>
-          </Card>
+                <Button
+                  onClick={handleSubmitReview}
+                  disabled={isSubmittingReview || rating === 0 || reviewText.length < 10}
+                  className="w-full"
+                >
+                  {isSubmittingReview ? "Submitting..." : "Submit Review"}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </main>
     </div>
