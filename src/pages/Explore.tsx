@@ -1,0 +1,739 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import DashboardNav from "@/components/DashboardNav";
+import { CreatePostDialog } from "@/components/CreatePostDialog";
+import { PostCard } from "@/components/PostCard";
+import { useToast } from "@/hooks/use-toast";
+import { MessageSquare, Users, Bookmark, Search, Send, UserCheck, UserPlus, Clock, X, Check } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { z } from "zod";
+
+const messageSchema = z.object({
+  content: z.string().trim().min(1, "Message cannot be empty").max(2000, "Message too long")
+});
+
+interface Post {
+  id: string;
+  content: string;
+  image_url: string | null;
+  likes_count: number;
+  comments_count: number;
+  created_at: string;
+  user_id: string;
+  profiles: {
+    full_name: string | null;
+    avatar_url: string | null;
+  };
+}
+
+interface Profile {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
+interface Connection {
+  id: string;
+  requester_id: string;
+  addressee_id: string;
+  status: string;
+  created_at: string;
+  requester?: Profile;
+  addressee?: Profile;
+}
+
+interface Message {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  content: string;
+  read: boolean;
+  created_at: string;
+}
+
+interface Conversation {
+  user: Profile;
+  lastMessage: Message | null;
+  unreadCount: number;
+}
+
+const Explore = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  // Posts state
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [userLikes, setUserLikes] = useState<Set<string>>(new Set());
+  const [userSaves, setUserSaves] = useState<Set<string>>(new Set());
+  
+  // Connections state
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [pendingReceived, setPendingReceived] = useState<Connection[]>([]);
+  const [pendingSent, setPendingSent] = useState<Connection[]>([]);
+  
+  // Messages state
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [messageText, setMessageText] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [allUsers, setAllUsers] = useState<Profile[]>([]);
+
+  useEffect(() => {
+    checkAuthAndLoad();
+  }, []);
+
+  const checkAuthAndLoad = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      navigate("/welcome");
+      return;
+    }
+
+    setCurrentUserId(session.user.id);
+    await Promise.all([
+      loadPosts(),
+      loadUserInteractions(session.user.id),
+      loadConnections(session.user.id),
+      loadAllUsers(),
+      loadConversations()
+    ]);
+    setIsLoading(false);
+  };
+
+  // Posts functions
+  const loadPosts = async () => {
+    const { data, error } = await supabase
+      .from("posts")
+      .select(`
+        *,
+        profiles:user_id (
+          full_name,
+          avatar_url
+        )
+      `)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast({ title: "Error loading posts", description: error.message, variant: "destructive" });
+      return;
+    }
+    setPosts(data as any);
+  };
+
+  const loadUserInteractions = async (userId: string) => {
+    const [likesData, savesData] = await Promise.all([
+      supabase.from("post_likes").select("post_id").eq("user_id", userId),
+      supabase.from("post_saves").select("post_id").eq("user_id", userId),
+    ]);
+
+    if (likesData.data) setUserLikes(new Set(likesData.data.map((l: any) => l.post_id)));
+    if (savesData.data) setUserSaves(new Set(savesData.data.map((s: any) => s.post_id)));
+  };
+
+  const handlePostUpdate = () => {
+    if (currentUserId) {
+      loadPosts();
+      loadUserInteractions(currentUserId);
+    }
+  };
+
+  // Connections functions
+  const loadConnections = async (userId: string) => {
+    const { data: accepted } = await supabase
+      .from("user_connections")
+      .select("*")
+      .eq("status", "accepted")
+      .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
+
+    if (accepted) {
+      const userIds = [...new Set(accepted.flatMap(c => [c.requester_id, c.addressee_id]))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .in("id", userIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const connectionsWithProfiles = accepted.map(conn => ({
+        ...conn,
+        requester: profileMap.get(conn.requester_id),
+        addressee: profileMap.get(conn.addressee_id)
+      }));
+      setConnections(connectionsWithProfiles as Connection[]);
+    }
+
+    const { data: received } = await supabase
+      .from("user_connections")
+      .select("*")
+      .eq("addressee_id", userId)
+      .eq("status", "pending");
+
+    if (received) {
+      const userIds = received.map(r => r.requester_id);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .in("id", userIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const requestsWithProfiles = received.map(req => ({
+        ...req,
+        requester: profileMap.get(req.requester_id)
+      }));
+      setPendingReceived(requestsWithProfiles as Connection[]);
+    }
+
+    const { data: sent } = await supabase
+      .from("user_connections")
+      .select("*")
+      .eq("requester_id", userId)
+      .eq("status", "pending");
+
+    if (sent) {
+      const userIds = sent.map(s => s.addressee_id);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .in("id", userIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const requestsWithProfiles = sent.map(req => ({
+        ...req,
+        addressee: profileMap.get(req.addressee_id)
+      }));
+      setPendingSent(requestsWithProfiles as Connection[]);
+    }
+  };
+
+  const acceptConnection = async (connectionId: string) => {
+    const { error } = await supabase
+      .from("user_connections")
+      .update({ status: "accepted" })
+      .eq("id", connectionId);
+
+    if (error) {
+      toast({ title: "Error", description: "Failed to accept connection", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Connection Accepted", description: "You are now connected!" });
+    if (currentUserId) loadConnections(currentUserId);
+  };
+
+  const rejectConnection = async (connectionId: string) => {
+    const { error } = await supabase.from("user_connections").delete().eq("id", connectionId);
+    if (error) {
+      toast({ title: "Error", description: "Failed to reject connection", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Request Rejected" });
+    if (currentUserId) loadConnections(currentUserId);
+  };
+
+  const removeConnection = async (connectionId: string) => {
+    const { error } = await supabase.from("user_connections").delete().eq("id", connectionId);
+    if (error) {
+      toast({ title: "Error", description: "Failed to remove connection", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Connection Removed" });
+    if (currentUserId) loadConnections(currentUserId);
+  };
+
+  // Messages functions
+  const loadAllUsers = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("public_profiles")
+      .select("id, full_name, avatar_url")
+      .neq("id", user.id);
+
+    setAllUsers(data || []);
+  };
+
+  const loadConversations = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: allMessages } = await supabase
+      .from("messages")
+      .select("*")
+      .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
+      .order("created_at", { ascending: false });
+
+    const userIds = new Set<string>();
+    allMessages?.forEach(msg => {
+      if (msg.sender_id !== user.id) userIds.add(msg.sender_id);
+      if (msg.recipient_id !== user.id) userIds.add(msg.recipient_id);
+    });
+
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url")
+      .in("id", Array.from(userIds));
+
+    const convos: Conversation[] = [];
+    profiles?.forEach(profile => {
+      const userMessages = allMessages?.filter(
+        msg => msg.sender_id === profile.id || msg.recipient_id === profile.id
+      ) || [];
+
+      const unreadCount = userMessages.filter(
+        msg => msg.recipient_id === user.id && msg.sender_id === profile.id && !msg.read
+      ).length;
+
+      convos.push({ user: profile, lastMessage: userMessages[0] || null, unreadCount });
+    });
+
+    setConversations(convos);
+  };
+
+  const loadMessages = async () => {
+    if (!selectedUser || !currentUserId) return;
+
+    const { data } = await supabase
+      .from("messages")
+      .select("*")
+      .or(
+        `and(sender_id.eq.${currentUserId},recipient_id.eq.${selectedUser.id}),and(sender_id.eq.${selectedUser.id},recipient_id.eq.${currentUserId})`
+      )
+      .order("created_at", { ascending: true });
+
+    setMessages(data || []);
+    
+    // Mark as read
+    await supabase
+      .from("messages")
+      .update({ read: true })
+      .eq("recipient_id", currentUserId)
+      .eq("sender_id", selectedUser.id)
+      .eq("read", false);
+      
+    loadConversations();
+  };
+
+  useEffect(() => {
+    if (selectedUser) loadMessages();
+  }, [selectedUser]);
+
+  const sendMessage = async () => {
+    if (!selectedUser || !currentUserId) return;
+
+    const validation = messageSchema.safeParse({ content: messageText });
+    if (!validation.success) {
+      toast({ title: "Invalid Message", description: validation.error.issues[0].message, variant: "destructive" });
+      return;
+    }
+
+    const { error } = await supabase.from("messages").insert({
+      sender_id: currentUserId,
+      recipient_id: selectedUser.id,
+      content: validation.data.content,
+    });
+
+    if (error) {
+      toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
+      return;
+    }
+
+    setMessageText("");
+    loadMessages();
+    loadConversations();
+  };
+
+  const getInitials = (name: string | null) => {
+    if (!name) return "U";
+    return name.split(" ").map(n => n[0]).join("").toUpperCase();
+  };
+
+  const filteredUsers = allUsers.filter(user =>
+    user.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Realtime subscriptions
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const postsChannel = supabase
+      .channel("posts-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => loadPosts())
+      .subscribe();
+
+    const messagesChannel = supabase
+      .channel("messages")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `recipient_id=eq.${currentUserId}` },
+        (payload) => {
+          if (selectedUser && payload.new.sender_id === selectedUser.id) {
+            setMessages(prev => [...prev, payload.new as Message]);
+          }
+          loadConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(postsChannel);
+      supabase.removeChannel(messagesChannel);
+    };
+  }, [currentUserId, selectedUser]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <DashboardNav />
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold">Explore</h1>
+          <CreatePostDialog onPostCreated={handlePostUpdate} />
+        </div>
+
+        <Tabs defaultValue="feed" className="w-full">
+          <TabsList className="grid w-full grid-cols-4 mb-8">
+            <TabsTrigger value="feed">Feed</TabsTrigger>
+            <TabsTrigger value="connections" className="flex items-center gap-1">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Connections</span>
+              {pendingReceived.length > 0 && (
+                <span className="ml-1 bg-accent text-accent-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {pendingReceived.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="flex items-center gap-1">
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden sm:inline">Messages</span>
+            </TabsTrigger>
+            <TabsTrigger value="saved" className="flex items-center gap-1">
+              <Bookmark className="h-4 w-4" />
+              <span className="hidden sm:inline">Saved</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Feed Tab */}
+          <TabsContent value="feed" className="space-y-6">
+            {posts.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">No posts yet. Be the first to share your travel story!</p>
+              </div>
+            ) : (
+              posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  currentUserId={currentUserId!}
+                  userLiked={userLikes.has(post.id)}
+                  userSaved={userSaves.has(post.id)}
+                  onUpdate={handlePostUpdate}
+                />
+              ))
+            )}
+          </TabsContent>
+
+          {/* Connections Tab */}
+          <TabsContent value="connections" className="space-y-6">
+            <Tabs defaultValue="connected" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="connected">Connected ({connections.length})</TabsTrigger>
+                <TabsTrigger value="requests">
+                  Requests ({pendingReceived.length})
+                </TabsTrigger>
+                <TabsTrigger value="sent">Sent ({pendingSent.length})</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="connected" className="mt-4">
+                {connections.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">No connections yet</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4">
+                    {connections.map((connection) => {
+                      const otherUser = connection.requester_id === currentUserId
+                        ? connection.addressee
+                        : connection.requester;
+                      return (
+                        <Card key={connection.id}>
+                          <CardContent className="flex items-center justify-between p-4">
+                            <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate(`/profile/${otherUser?.id}`)}>
+                              <Avatar className="h-12 w-12">
+                                <AvatarImage src={otherUser?.avatar_url || undefined} />
+                                <AvatarFallback>{getInitials(otherUser?.full_name || null)}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <h3 className="font-semibold hover:underline">{otherUser?.full_name || "User"}</h3>
+                                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                  <UserCheck className="h-3 w-3" /> Connected
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button variant="outline" size="sm" onClick={() => {
+                                setSelectedUser(otherUser || null);
+                                // Switch to messages tab
+                                const messagesTab = document.querySelector('[value="messages"]') as HTMLButtonElement;
+                                messagesTab?.click();
+                              }}>
+                                <MessageSquare className="h-4 w-4 mr-1" />
+                                Message
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => removeConnection(connection.id)}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="requests" className="mt-4">
+                {pendingReceived.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <UserPlus className="h-12 w-12 text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">No pending requests</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4">
+                    {pendingReceived.map((request) => (
+                      <Card key={request.id}>
+                        <CardContent className="flex items-center justify-between p-4">
+                          <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate(`/profile/${request.requester?.id}`)}>
+                            <Avatar className="h-12 w-12">
+                              <AvatarImage src={request.requester?.avatar_url || undefined} />
+                              <AvatarFallback>{getInitials(request.requester?.full_name || null)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <h3 className="font-semibold hover:underline">{request.requester?.full_name || "User"}</h3>
+                              <p className="text-sm text-muted-foreground">Wants to connect</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => acceptConnection(request.id)}>
+                              <Check className="h-4 w-4 mr-1" /> Accept
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => rejectConnection(request.id)}>
+                              <X className="h-4 w-4 mr-1" /> Decline
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="sent" className="mt-4">
+                {pendingSent.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <Clock className="h-12 w-12 text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">No sent requests</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4">
+                    {pendingSent.map((request) => (
+                      <Card key={request.id}>
+                        <CardContent className="flex items-center justify-between p-4">
+                          <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate(`/profile/${request.addressee?.id}`)}>
+                            <Avatar className="h-12 w-12">
+                              <AvatarImage src={request.addressee?.avatar_url || undefined} />
+                              <AvatarFallback>{getInitials(request.addressee?.full_name || null)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <h3 className="font-semibold hover:underline">{request.addressee?.full_name || "User"}</h3>
+                              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                <Clock className="h-3 w-3" /> Pending
+                              </p>
+                            </div>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => rejectConnection(request.id)}>
+                            Cancel
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+
+          {/* Messages Tab */}
+          <TabsContent value="messages">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-300px)] min-h-[500px]">
+              <Card className="md:col-span-1">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" /> Conversations
+                  </CardTitle>
+                  <div className="relative mt-2">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <Input
+                      placeholder="Search users..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[400px]">
+                    {searchQuery ? (
+                      filteredUsers.map((user) => (
+                        <div
+                          key={user.id}
+                          className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 border-b ${selectedUser?.id === user.id ? "bg-muted" : ""}`}
+                          onClick={() => { setSelectedUser(user); setSearchQuery(""); }}
+                        >
+                          <Avatar>
+                            <AvatarImage src={user.avatar_url || undefined} />
+                            <AvatarFallback>{getInitials(user.full_name)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{user.full_name || "User"}</p>
+                            <p className="text-sm text-muted-foreground">Start a conversation</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : conversations.length > 0 ? (
+                      conversations.map((convo) => (
+                        <div
+                          key={convo.user.id}
+                          className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 border-b ${selectedUser?.id === convo.user.id ? "bg-muted" : ""}`}
+                          onClick={() => setSelectedUser(convo.user)}
+                        >
+                          <Avatar>
+                            <AvatarImage src={convo.user.avatar_url || undefined} />
+                            <AvatarFallback>{getInitials(convo.user.full_name)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium truncate">{convo.user.full_name || "User"}</p>
+                              {convo.unreadCount > 0 && (
+                                <span className="bg-accent text-accent-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                  {convo.unreadCount}
+                                </span>
+                              )}
+                            </div>
+                            {convo.lastMessage && (
+                              <p className="text-sm text-muted-foreground truncate">{convo.lastMessage.content}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-12 px-4">
+                        <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                        <p className="text-muted-foreground">No conversations yet</p>
+                      </div>
+                    )}
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+
+              <Card className="md:col-span-2 flex flex-col">
+                {selectedUser ? (
+                  <>
+                    <CardHeader className="border-b py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="cursor-pointer" onClick={() => navigate(`/profile/${selectedUser.id}`)}>
+                          <AvatarImage src={selectedUser.avatar_url || undefined} />
+                          <AvatarFallback>{getInitials(selectedUser.full_name)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <CardTitle className="text-lg">{selectedUser.full_name || "User"}</CardTitle>
+                          <CardDescription>Active now</CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex-1 p-0">
+                      <ScrollArea className="h-[300px] p-4">
+                        {messages.map((msg) => (
+                          <div key={msg.id} className={`mb-4 flex ${msg.sender_id === currentUserId ? "justify-end" : "justify-start"}`}>
+                            <div className={`max-w-[70%] rounded-lg p-3 ${msg.sender_id === currentUserId ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                              <p className="text-sm">{msg.content}</p>
+                              <p className="text-xs mt-1 opacity-70">{format(new Date(msg.created_at), "h:mm a")}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </ScrollArea>
+                    </CardContent>
+                    <div className="p-4 border-t">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Type a message..."
+                          value={messageText}
+                          onChange={(e) => setMessageText(e.target.value)}
+                          onKeyPress={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                        />
+                        <Button onClick={sendMessage} disabled={!messageText.trim()}>
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <CardContent className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <MessageSquare className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                      <p className="text-lg text-muted-foreground">Select a conversation</p>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Saved Tab */}
+          <TabsContent value="saved" className="space-y-6">
+            {posts.filter(p => userSaves.has(p.id)).length === 0 ? (
+              <div className="text-center py-12">
+                <Bookmark className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">No saved posts yet</p>
+              </div>
+            ) : (
+              posts.filter(p => userSaves.has(p.id)).map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  currentUserId={currentUserId!}
+                  userLiked={userLikes.has(post.id)}
+                  userSaved={userSaves.has(post.id)}
+                  onUpdate={handlePostUpdate}
+                />
+              ))
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+};
+
+export default Explore;
