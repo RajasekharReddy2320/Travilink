@@ -1,17 +1,113 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, Suspense, lazy } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import FeaturedTrips from "@/components/FeaturedTrips";
-import { Plane, Sparkles } from "lucide-react";
+import FloatingParticles from "@/components/FloatingParticles";
+import { useScrollAnimation } from "@/hooks/useScrollAnimation";
+import { Plane, Sparkles, Users, Globe, Camera, Ticket, Bot, Smartphone, ChevronDown } from "lucide-react";
+
+const RealisticGlobe = lazy(() => import("@/components/RealisticGlobe"));
+
+const AnimatedSection = ({ 
+  children, 
+  className = "", 
+  delay = 0 
+}: { 
+  children: React.ReactNode; 
+  className?: string; 
+  delay?: number;
+}) => {
+  const { ref, isVisible } = useScrollAnimation({ threshold: 0.15 });
+
+  return (
+    <div
+      ref={ref}
+      className={`transition-all duration-1000 ease-out ${className}`}
+      style={{
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? 'translateY(0)' : 'translateY(60px)',
+        transitionDelay: `${delay}ms`,
+      }}
+    >
+      {children}
+    </div>
+  );
+};
+
+const features = [
+  {
+    Icon: Users,
+    emoji: "👥",
+    title: "Social Travel Network",
+    subtitle: "Connect & Explore Together",
+    description: "Connect with fellow travelers, share experiences, and discover trips through our vibrant community. Find travel buddies who match your style and interests.",
+    longDescription: "Join thousands of passionate travelers who share their stories, tips, and adventures. Our community-driven platform helps you find the perfect travel companions, get insider recommendations, and make lifelong connections.",
+    gradient: "from-pink-500 via-rose-500 to-red-500",
+    bgGradient: "from-pink-900/30 via-rose-900/20 to-red-900/30",
+    accent: "pink",
+  },
+  {
+    Icon: Globe,
+    emoji: "🌍",
+    title: "Find Travel Companions",
+    subtitle: "Never Travel Alone",
+    description: "Create or join travel groups for your upcoming trips. Connect with people traveling to the same destination and make your journey more memorable.",
+    longDescription: "Whether you're a solo adventurer seeking company or a group looking for new members, our smart matching system connects you with compatible travelers. Share costs, experiences, and create memories together.",
+    gradient: "from-blue-500 via-cyan-500 to-teal-500",
+    bgGradient: "from-blue-900/30 via-cyan-900/20 to-teal-900/30",
+    accent: "cyan",
+  },
+  {
+    Icon: Camera,
+    emoji: "📸",
+    title: "Share Your Adventures",
+    subtitle: "Inspire & Be Inspired",
+    description: "Post photos, stories, and experiences from your travels. Like, comment, and save posts from fellow travelers to inspire your next adventure.",
+    longDescription: "Turn your travel memories into inspiring stories. Our rich media platform lets you share photos, videos, and detailed trip experiences. Get featured, gain followers, and become a travel influencer.",
+    gradient: "from-violet-500 via-purple-500 to-fuchsia-500",
+    bgGradient: "from-violet-900/30 via-purple-900/20 to-fuchsia-900/30",
+    accent: "purple",
+  },
+  {
+    Icon: Ticket,
+    emoji: "🎫",
+    title: "Unified Booking",
+    subtitle: "All Tickets, One Place",
+    description: "Book flights, trains, and buses from multiple providers in one place. Get digital and QR code tickets for easy access.",
+    longDescription: "Compare prices across hundreds of providers, book seamlessly, and manage all your tickets in one digital wallet. Our smart booking system finds you the best deals and keeps everything organized.",
+    gradient: "from-amber-500 via-orange-500 to-red-500",
+    bgGradient: "from-amber-900/30 via-orange-900/20 to-red-900/30",
+    accent: "orange",
+  },
+  {
+    Icon: Bot,
+    emoji: "🤖",
+    title: "AI Trip Planning",
+    subtitle: "Smart Itineraries",
+    description: "Get personalized itineraries tailored to your preferences with our AI-powered trip planner. Discover destinations, activities, and hidden gems.",
+    longDescription: "Our advanced AI understands your travel style, budget, and interests to create perfect itineraries. From must-see attractions to hidden local gems, get recommendations that match your unique preferences.",
+    gradient: "from-emerald-500 via-green-500 to-lime-500",
+    bgGradient: "from-emerald-900/30 via-green-900/20 to-lime-900/30",
+    accent: "emerald",
+  },
+  {
+    Icon: Smartphone,
+    emoji: "📱",
+    title: "All-in-One Platform",
+    subtitle: "Your Travel Companion",
+    description: "Manage bookings, connect with travelers, and plan trips all in one intuitive dashboard. Access everything you need for your perfect journey.",
+    longDescription: "From planning to booking to exploring, everything you need is in one place. Real-time updates, offline access, and seamless synchronization across all your devices make traveling effortless.",
+    gradient: "from-indigo-500 via-blue-500 to-sky-500",
+    bgGradient: "from-indigo-900/30 via-blue-900/20 to-sky-900/30",
+    accent: "blue",
+  }
+];
 
 const Welcome = () => {
   const navigate = useNavigate();
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [globeRotation, setGlobeRotation] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -29,83 +125,23 @@ const Welcome = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Globe rotation animation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setGlobeRotation(prev => (prev + 1) % 360);
-    }, 50);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Auto-slide features
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveIndex(prev => (prev + 1) % features.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const features = [
-    {
-      emoji: "👥",
-      title: "Social Travel Network",
-      description: "Connect with fellow travelers, share experiences, and discover trips through our vibrant community. Find travel buddies and get inspired by real travelers' stories.",
-      gradient: "from-pink-500 via-rose-500 to-red-500",
-      glow: "shadow-pink-500/50",
-      bgGlow: "bg-pink-500/20"
-    },
-    {
-      emoji: "🌍",
-      title: "Find Travel Companions",
-      description: "Create or join travel groups for your upcoming trips. Connect with people traveling to the same destination and make your journey more memorable.",
-      gradient: "from-blue-500 via-cyan-500 to-teal-500",
-      glow: "shadow-cyan-500/50",
-      bgGlow: "bg-cyan-500/20"
-    },
-    {
-      emoji: "📸",
-      title: "Share Your Adventures",
-      description: "Post photos, stories, and experiences from your travels. Like, comment, and save posts from fellow travelers to inspire your next adventure.",
-      gradient: "from-violet-500 via-purple-500 to-fuchsia-500",
-      glow: "shadow-purple-500/50",
-      bgGlow: "bg-purple-500/20"
-    },
-    {
-      emoji: "🎫",
-      title: "Unified Booking",
-      description: "Book flights, trains, and buses from multiple providers in one place. Get digital and QR code tickets for easy access.",
-      gradient: "from-amber-500 via-orange-500 to-red-500",
-      glow: "shadow-orange-500/50",
-      bgGlow: "bg-orange-500/20"
-    },
-    {
-      emoji: "🤖",
-      title: "AI Trip Planning",
-      description: "Get personalized itineraries tailored to your preferences with our AI-powered trip planner. Discover destinations, activities, and hidden gems.",
-      gradient: "from-emerald-500 via-green-500 to-lime-500",
-      glow: "shadow-emerald-500/50",
-      bgGlow: "bg-emerald-500/20"
-    },
-    {
-      emoji: "📱",
-      title: "All-in-One Platform",
-      description: "Manage bookings, connect with travelers, and plan trips all in one intuitive dashboard. Access everything you need for your perfect journey.",
-      gradient: "from-indigo-500 via-blue-500 to-sky-500",
-      glow: "shadow-blue-500/50",
-      bgGlow: "bg-blue-500/20"
-    }
-  ];
+  const scrollToFeatures = () => {
+    document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-background relative overflow-hidden">
-      {/* Animated Background */}
-      <div className="fixed inset-0 z-0">
+    <div className="min-h-screen bg-background relative overflow-x-hidden">
+      {/* Floating Particles Background */}
+      <FloatingParticles />
+
+      {/* Animated Background Gradients */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-radial from-primary/5 to-transparent rounded-full" />
+        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-accent/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
 
+      {/* Header */}
       <header className="relative z-50 bg-background/60 backdrop-blur-xl border-b border-border/50 sticky top-0">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center max-w-6xl">
           <Link to="/welcome" className="flex items-center gap-2 group">
@@ -128,249 +164,174 @@ const Welcome = () => {
       </header>
 
       <main className="relative z-10">
-        {/* Hero with Rotating Globe */}
-        <section className="container mx-auto px-6 py-16 md:py-24 max-w-5xl">
-          <div className="flex flex-col lg:flex-row items-center gap-12">
-            {/* Text Content */}
-            <div className="flex-1 text-center lg:text-left">
-              <Badge variant="secondary" className="mb-6 px-4 py-2 bg-background/60 backdrop-blur-xl border border-border/50 shadow-lg">
-                <Sparkles className="h-4 w-4 mr-2 text-accent" />
-                Welcome to Travexa
-              </Badge>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
-                Your{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-accent to-primary animate-gradient">
-                  Social Travel
-                </span>
-                <br />Network
-              </h1>
-              <p className="text-lg text-muted-foreground max-w-xl mb-8">
-                Connect with fellow travelers, share experiences, and find travel companions for your next adventure around the world.
-              </p>
-              <Button size="lg" asChild className="px-10 py-6 text-lg shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-105">
-                <Link to="/signup">
-                  <Sparkles className="mr-2 h-5 w-5" />
-                  Join the Community
-                </Link>
-              </Button>
-            </div>
+        {/* Hero Section with Globe */}
+        <section className="min-h-[90vh] flex items-center justify-center relative">
+          <div className="container mx-auto px-6 py-16 max-w-6xl">
+            <div className="flex flex-col lg:flex-row items-center gap-12">
+              {/* Text Content */}
+              <AnimatedSection className="flex-1 text-center lg:text-left">
+                <Badge variant="secondary" className="mb-6 px-4 py-2 bg-background/60 backdrop-blur-xl border border-border/50 shadow-lg">
+                  <Sparkles className="h-4 w-4 mr-2 text-accent" />
+                  Welcome to Travexa
+                </Badge>
+                <h1 className="text-4xl md:text-5xl lg:text-7xl font-bold mb-6 leading-tight">
+                  Your{' '}
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 animate-gradient">
+                    Social Travel
+                  </span>
+                  <br />Network
+                </h1>
+                <p className="text-lg md:text-xl text-muted-foreground max-w-xl mb-8">
+                  Connect with fellow travelers, share experiences, and find travel companions for your next adventure around the world.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                  <Button size="lg" asChild className="px-10 py-6 text-lg shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-105">
+                    <Link to="/signup">
+                      <Sparkles className="mr-2 h-5 w-5" />
+                      Join the Community
+                    </Link>
+                  </Button>
+                  <Button size="lg" variant="outline" onClick={scrollToFeatures} className="px-10 py-6 text-lg">
+                    Explore Features
+                    <ChevronDown className="ml-2 h-5 w-5 animate-bounce" />
+                  </Button>
+                </div>
+              </AnimatedSection>
 
-            {/* Rotating Globe */}
-            <div className="flex-1 flex justify-center">
-              <div className="relative w-64 h-64 md:w-80 md:h-80">
-                {/* Globe Glow Effects */}
-                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-cyan-500/30 via-blue-500/20 to-purple-500/30 blur-2xl animate-pulse" />
-                <div className="absolute inset-4 rounded-full bg-gradient-to-tr from-emerald-500/20 via-transparent to-pink-500/20 blur-xl" />
-                
-                {/* Globe */}
-                <div 
-                  className="relative w-full h-full rounded-full overflow-hidden shadow-2xl shadow-cyan-500/30"
-                  style={{
-                    background: `
-                      radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3) 0%, transparent 50%),
-                      linear-gradient(135deg, 
-                        hsl(200 80% 50%) 0%, 
-                        hsl(220 70% 40%) 25%,
-                        hsl(180 60% 35%) 50%,
-                        hsl(160 50% 30%) 75%,
-                        hsl(200 80% 50%) 100%
-                      )
-                    `,
-                    transform: `rotateY(${globeRotation}deg)`,
-                    transformStyle: 'preserve-3d',
-                  }}
-                >
-                  {/* Continents Pattern */}
-                  <div 
-                    className="absolute inset-0 opacity-40"
-                    style={{
-                      backgroundImage: `
-                        radial-gradient(ellipse 40% 30% at 20% 40%, hsl(140 50% 35%) 0%, transparent 70%),
-                        radial-gradient(ellipse 35% 50% at 60% 35%, hsl(140 50% 35%) 0%, transparent 70%),
-                        radial-gradient(ellipse 20% 35% at 75% 60%, hsl(140 50% 35%) 0%, transparent 70%),
-                        radial-gradient(ellipse 30% 20% at 40% 70%, hsl(140 50% 35%) 0%, transparent 70%)
-                      `,
-                      transform: `translateX(${globeRotation * 0.5}px)`,
-                    }}
-                  />
+              {/* 3D Globe */}
+              <AnimatedSection delay={300} className="flex-1 flex justify-center">
+                <div className="relative w-[320px] h-[320px] md:w-[420px] md:h-[420px]">
+                  {/* Globe Glow Effects */}
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-cyan-500/40 via-blue-500/30 to-purple-500/40 blur-3xl animate-pulse" />
                   
-                  {/* Grid Lines */}
-                  <div className="absolute inset-0 opacity-20">
-                    {[...Array(8)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="absolute left-1/2 top-0 w-px h-full bg-white/50 origin-center"
-                        style={{ transform: `rotateZ(${i * 22.5}deg)` }}
-                      />
-                    ))}
-                    {[...Array(5)].map((_, i) => (
-                      <div
-                        key={`h-${i}`}
-                        className="absolute left-0 w-full h-px bg-white/50"
-                        style={{ top: `${20 + i * 15}%` }}
-                      />
-                    ))}
+                  {/* 3D Globe Container */}
+                  <div className="relative w-full h-full rounded-full overflow-hidden">
+                    <Suspense fallback={
+                      <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 animate-pulse flex items-center justify-center">
+                        <Globe className="h-20 w-20 text-white/50 animate-spin" style={{ animationDuration: '3s' }} />
+                      </div>
+                    }>
+                      <RealisticGlobe />
+                    </Suspense>
                   </div>
 
-                  {/* Glossy Reflection */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent rounded-full" />
-                  <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-black/20 to-transparent" />
-                </div>
+                  {/* Orbiting Planes */}
+                  <div className="absolute inset-0 animate-spin" style={{ animationDuration: '20s' }}>
+                    <Plane className="absolute -top-6 left-1/2 -translate-x-1/2 h-8 w-8 text-accent drop-shadow-lg" style={{ transform: 'rotate(45deg)' }} />
+                  </div>
+                  <div className="absolute inset-0 animate-spin" style={{ animationDuration: '15s', animationDirection: 'reverse' }}>
+                    <Plane className="absolute -bottom-6 left-1/2 -translate-x-1/2 h-6 w-6 text-primary drop-shadow-lg" style={{ transform: 'rotate(-135deg)' }} />
+                  </div>
 
-                {/* Orbiting Planes */}
-                <div 
-                  className="absolute inset-0"
-                  style={{ 
-                    transform: `rotateZ(${globeRotation * 2}deg)`,
-                    transformOrigin: 'center center'
-                  }}
-                >
-                  <Plane className="absolute -top-4 left-1/2 -translate-x-1/2 h-6 w-6 text-accent" style={{ transform: 'rotate(45deg)' }} />
+                  {/* Travel the World Text */}
+                  <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                    <p className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500">
+                      ✈️ Travel the World ✈️
+                    </p>
+                  </div>
                 </div>
-                <div 
-                  className="absolute inset-0"
-                  style={{ 
-                    transform: `rotateZ(${-globeRotation * 1.5 + 180}deg)`,
-                    transformOrigin: 'center center'
-                  }}
-                >
-                  <Plane className="absolute -bottom-4 left-1/2 -translate-x-1/2 h-5 w-5 text-primary" style={{ transform: 'rotate(-135deg)' }} />
-                </div>
-
-                {/* Travel the World Text */}
-                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                  <p className="text-sm font-medium text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500">
-                    Travel the World ✈️
-                  </p>
-                </div>
-              </div>
+              </AnimatedSection>
             </div>
+          </div>
+
+          {/* Scroll Indicator */}
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+            <ChevronDown className="h-8 w-8 text-muted-foreground" />
           </div>
         </section>
 
-        {/* Floating Feature Cards */}
-        <section className="container mx-auto px-6 py-16 max-w-6xl">
-          <div className="text-center mb-12">
-            <Badge variant="secondary" className="mb-4 bg-background/60 backdrop-blur-xl border border-border/50">
-              <Sparkles className="h-3 w-3 mr-1" />
-              Features
-            </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Why Choose{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-accent to-primary">
-                Travexa
-              </span>?
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Your all-in-one travel companion that revolutionizes how you plan, book, and experience your journeys
-            </p>
-          </div>
-
-          {/* Carousel Container */}
-          <div className="relative overflow-hidden py-8">
-            <div 
-              className="flex transition-transform duration-700 ease-out gap-6"
-              style={{ transform: `translateX(calc(-${activeIndex * (100 / 3)}% - ${activeIndex * 24}px))` }}
+        {/* Full Page Feature Sections */}
+        <section id="features" className="relative">
+          {features.map((feature, idx) => (
+            <div
+              key={idx}
+              className={`min-h-screen flex items-center justify-center relative overflow-hidden`}
+              style={{
+                background: `linear-gradient(135deg, ${feature.bgGradient.includes('from-') ? '' : feature.bgGradient})`,
+              }}
             >
-              {[...features, ...features].map((feature, idx) => {
-                const isActive = idx % features.length === activeIndex;
-                return (
-                  <div
-                    key={idx}
-                    className={`flex-shrink-0 w-full md:w-[calc(33.333%-16px)] transition-all duration-500 ${
-                      isActive ? 'scale-105 z-10' : 'scale-95 opacity-70'
-                    }`}
-                    onClick={() => setActiveIndex(idx % features.length)}
-                  >
-                    <div 
-                      className={`
-                        relative p-6 rounded-2xl cursor-pointer
-                        backdrop-blur-xl bg-background/40
-                        border-2 transition-all duration-500
-                        ${isActive 
-                          ? `border-transparent shadow-2xl ${feature.glow}` 
-                          : 'border-border/30 hover:border-border/50'
-                        }
+              {/* Background Gradient */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${feature.bgGradient} opacity-50`} />
+              
+              {/* Glossy Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-black/20" />
+              
+              {/* Content */}
+              <div className="container mx-auto px-6 py-20 max-w-6xl relative z-10">
+                <div className={`flex flex-col ${idx % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'} items-center gap-12 lg:gap-20`}>
+                  {/* Icon Side */}
+                  <AnimatedSection delay={200} className="flex-1 flex justify-center">
+                    <div className="relative">
+                      {/* Glow Effect */}
+                      <div className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} rounded-full blur-3xl opacity-30 scale-150`} />
+                      
+                      {/* Icon Container */}
+                      <div className={`
+                        relative w-48 h-48 md:w-64 md:h-64 rounded-full 
+                        bg-gradient-to-br ${feature.gradient}
+                        flex items-center justify-center
+                        shadow-2xl
+                        animate-float
                       `}
                       style={{
-                        background: isActive 
-                          ? `linear-gradient(135deg, hsl(var(--background) / 0.9), hsl(var(--background) / 0.7))` 
-                          : undefined
+                        animation: 'float 6s ease-in-out infinite',
+                        animationDelay: `${idx * 0.5}s`,
                       }}
-                    >
-                      {/* Glossy Overlay */}
-                      <div className="absolute inset-0 rounded-2xl overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
-                        <div className={`absolute inset-0 ${feature.bgGlow} opacity-0 transition-opacity duration-500 ${isActive ? 'opacity-30' : ''}`} />
-                      </div>
-
-                      {/* Gradient Border Effect */}
-                      {isActive && (
-                        <div className={`absolute -inset-[2px] rounded-2xl bg-gradient-to-r ${feature.gradient} -z-10 blur-sm opacity-60`} />
-                      )}
-
-                      <div className="relative z-10">
-                        <div className={`
-                          text-5xl mb-4 transition-all duration-500
-                          ${isActive ? 'scale-125 animate-bounce' : ''}
-                        `}>
+                      >
+                        {/* Glossy Finish */}
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/40 via-white/10 to-transparent" />
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-t from-black/20 to-transparent" />
+                        
+                        {/* Icon */}
+                        <feature.Icon className="h-20 w-20 md:h-28 md:w-28 text-white drop-shadow-2xl relative z-10" strokeWidth={1.5} />
+                        
+                        {/* Emoji Badge */}
+                        <div className="absolute -top-4 -right-4 text-5xl animate-bounce" style={{ animationDelay: `${idx * 0.2}s` }}>
                           {feature.emoji}
                         </div>
-                        <h3 className={`
-                          text-xl font-bold mb-3 transition-all duration-300
-                          ${isActive ? `text-transparent bg-clip-text bg-gradient-to-r ${feature.gradient}` : ''}
-                        `}>
-                          {feature.title}
-                        </h3>
-                        <p className="text-muted-foreground leading-relaxed text-sm">
-                          {feature.description}
-                        </p>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  </AnimatedSection>
 
-            {/* Carousel Indicators */}
-            <div className="flex justify-center gap-2 mt-8">
-              {features.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveIndex(idx)}
-                  className={`
-                    h-2 rounded-full transition-all duration-300
-                    ${idx === activeIndex 
-                      ? 'w-8 bg-gradient-to-r from-primary to-accent' 
-                      : 'w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50'
-                    }
-                  `}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Static Grid for Mobile */}
-          <div className="hidden md:hidden grid-cols-1 gap-4 mt-8">
-            {features.map((feature, idx) => (
-              <div
-                key={idx}
-                className="p-6 rounded-2xl backdrop-blur-xl bg-background/40 border border-border/30"
-              >
-                <div className="text-4xl mb-3">{feature.emoji}</div>
-                <h3 className={`text-lg font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r ${feature.gradient}`}>
-                  {feature.title}
-                </h3>
-                <p className="text-muted-foreground text-sm">{feature.description}</p>
+                  {/* Text Side */}
+                  <AnimatedSection className="flex-1 text-center lg:text-left">
+                    <Badge className={`mb-4 bg-gradient-to-r ${feature.gradient} text-white border-0 text-sm px-4 py-1`}>
+                      {feature.subtitle}
+                    </Badge>
+                    <h2 className={`text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r ${feature.gradient}`}>
+                      {feature.title}
+                    </h2>
+                    <p className="text-xl text-muted-foreground mb-6 leading-relaxed">
+                      {feature.description}
+                    </p>
+                    <p className="text-lg text-muted-foreground/80 mb-8 leading-relaxed">
+                      {feature.longDescription}
+                    </p>
+                    <Button 
+                      size="lg" 
+                      asChild
+                      className={`px-8 py-6 text-lg bg-gradient-to-r ${feature.gradient} border-0 hover:opacity-90 transition-all hover:scale-105 shadow-xl`}
+                    >
+                      <Link to="/signup">
+                        Get Started
+                        <Sparkles className="ml-2 h-5 w-5" />
+                      </Link>
+                    </Button>
+                  </AnimatedSection>
+                </div>
               </div>
-            ))}
-          </div>
+
+              {/* Decorative Elements */}
+              <div className={`absolute top-20 ${idx % 2 === 0 ? 'right-20' : 'left-20'} w-32 h-32 bg-gradient-to-r ${feature.gradient} rounded-full blur-3xl opacity-20`} />
+              <div className={`absolute bottom-20 ${idx % 2 === 0 ? 'left-20' : 'right-20'} w-48 h-48 bg-gradient-to-r ${feature.gradient} rounded-full blur-3xl opacity-15`} />
+            </div>
+          ))}
         </section>
 
         <FeaturedTrips />
 
         {/* Feedback Section */}
-        <section className="container mx-auto px-6 py-20 max-w-4xl">
+        <AnimatedSection className="container mx-auto px-6 py-20 max-w-4xl">
           <Card className="relative overflow-hidden border-2 border-accent/20 bg-gradient-to-br from-accent/5 via-background to-primary/5 backdrop-blur-xl shadow-2xl">
             <div className="absolute top-0 right-0 w-64 h-64 bg-accent/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
@@ -402,7 +363,7 @@ const Welcome = () => {
               </div>
             </CardContent>
           </Card>
-        </section>
+        </AnimatedSection>
       </main>
 
       <footer className="relative z-10 border-t border-border/50 bg-background/60 backdrop-blur-xl">
@@ -419,6 +380,32 @@ const Welcome = () => {
           </div>
         </div>
       </footer>
+
+      {/* Float Animation Keyframes */}
+      <style>{`
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0px) rotate(0deg);
+          }
+          50% {
+            transform: translateY(-20px) rotate(5deg);
+          }
+        }
+        
+        @keyframes gradient {
+          0%, 100% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+        }
+        
+        .animate-gradient {
+          background-size: 200% 200%;
+          animation: gradient 4s ease infinite;
+        }
+      `}</style>
     </div>
   );
 };
