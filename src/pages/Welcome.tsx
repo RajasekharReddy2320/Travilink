@@ -11,24 +11,24 @@ import { Plane, Sparkles, Users, Globe, Camera, Ticket, Bot, Smartphone, Chevron
 
 const RealisticGlobe = lazy(() => import("@/components/RealisticGlobe"));
 
-const AnimatedSection = ({ 
-  children, 
-  className = "", 
-  delay = 0 
-}: { 
-  children: React.ReactNode; 
-  className?: string; 
+const AnimatedSection = ({
+  children,
+  className = "",
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  className?: string;
   delay?: number;
 }) => {
-  const { ref, isVisible } = useScrollAnimation({ threshold: 0.15 });
+  const { ref, isVisible } = useScrollAnimation({ threshold: 0.2 });
 
   return (
     <div
       ref={ref}
-      className={`transition-all duration-1000 ease-out ${className}`}
+      className={`transition-all duration-1000 ease-out will-change-transform ${className}`}
       style={{
         opacity: isVisible ? 1 : 0,
-        transform: isVisible ? 'translateY(0)' : 'translateY(60px)',
+        transform: isVisible ? "translate3d(0,0,0)" : "translate3d(64px,0,0)",
         transitionDelay: `${delay}ms`,
       }}
     >
@@ -241,50 +241,52 @@ const Welcome = () => {
         </section>
 
         {/* Full Page Feature Sections */}
-        <section id="features" className="relative">
+        <section id="features" className="relative snap-y snap-mandatory">
           {features.map((feature, idx) => (
             <div
               key={idx}
-              className={`min-h-screen flex items-center justify-center relative overflow-hidden`}
-              style={{
-                background: `linear-gradient(135deg, ${feature.bgGradient.includes('from-') ? '' : feature.bgGradient})`,
-              }}
+              className="min-h-screen flex items-center justify-center relative overflow-hidden snap-start"
             >
               {/* Background Gradient */}
               <div className={`absolute inset-0 bg-gradient-to-br ${feature.bgGradient} opacity-50`} />
-              
+
               {/* Glossy Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-black/20" />
-              
+              <div className="absolute inset-0 bg-gradient-to-b from-background/0 via-background/0 to-foreground/10" />
+
               {/* Content */}
               <div className="container mx-auto px-6 py-20 max-w-6xl relative z-10">
-                <div className={`flex flex-col ${idx % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'} items-center gap-12 lg:gap-20`}>
+                <div
+                  className={`flex flex-col ${idx % 2 === 0 ? "lg:flex-row" : "lg:flex-row-reverse"} items-center gap-12 lg:gap-20`}
+                >
                   {/* Icon Side */}
                   <AnimatedSection delay={200} className="flex-1 flex justify-center">
                     <div className="relative">
                       {/* Glow Effect */}
                       <div className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} rounded-full blur-3xl opacity-30 scale-150`} />
-                      
+
                       {/* Icon Container */}
-                      <div className={`
-                        relative w-48 h-48 md:w-64 md:h-64 rounded-full 
-                        bg-gradient-to-br ${feature.gradient}
-                        flex items-center justify-center
-                        shadow-2xl
-                        animate-float
-                      `}
-                      style={{
-                        animation: 'float 6s ease-in-out infinite',
-                        animationDelay: `${idx * 0.5}s`,
-                      }}
+                      <div
+                        className={`
+                          relative w-48 h-48 md:w-64 md:h-64 rounded-full 
+                          bg-gradient-to-br ${feature.gradient}
+                          flex items-center justify-center
+                          shadow-2xl
+                        `}
+                        style={{
+                          animation: "float 6s ease-in-out infinite",
+                          animationDelay: `${idx * 0.5}s`,
+                        }}
                       >
                         {/* Glossy Finish */}
-                        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/40 via-white/10 to-transparent" />
-                        <div className="absolute inset-0 rounded-full bg-gradient-to-t from-black/20 to-transparent" />
-                        
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-background/40 via-background/10 to-transparent" />
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-t from-foreground/15 to-transparent" />
+
                         {/* Icon */}
-                        <feature.Icon className="h-20 w-20 md:h-28 md:w-28 text-white drop-shadow-2xl relative z-10" strokeWidth={1.5} />
-                        
+                        <feature.Icon
+                          className="h-20 w-20 md:h-28 md:w-28 text-primary-foreground drop-shadow-2xl relative z-10"
+                          strokeWidth={1.5}
+                        />
+
                         {/* Emoji Badge */}
                         <div className="absolute -top-4 -right-4 text-5xl animate-bounce" style={{ animationDelay: `${idx * 0.2}s` }}>
                           {feature.emoji}
@@ -295,20 +297,18 @@ const Welcome = () => {
 
                   {/* Text Side */}
                   <AnimatedSection className="flex-1 text-center lg:text-left">
-                    <Badge className={`mb-4 bg-gradient-to-r ${feature.gradient} text-white border-0 text-sm px-4 py-1`}>
+                    <Badge className={`mb-4 bg-gradient-to-r ${feature.gradient} text-primary-foreground border-0 text-sm px-4 py-1`}>
                       {feature.subtitle}
                     </Badge>
-                    <h2 className={`text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r ${feature.gradient}`}>
+                    <h2
+                      className={`text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r ${feature.gradient}`}
+                    >
                       {feature.title}
                     </h2>
-                    <p className="text-xl text-muted-foreground mb-6 leading-relaxed">
-                      {feature.description}
-                    </p>
-                    <p className="text-lg text-muted-foreground/80 mb-8 leading-relaxed">
-                      {feature.longDescription}
-                    </p>
-                    <Button 
-                      size="lg" 
+                    <p className="text-xl text-muted-foreground mb-6 leading-relaxed">{feature.description}</p>
+                    <p className="text-lg text-muted-foreground/80 mb-8 leading-relaxed">{feature.longDescription}</p>
+                    <Button
+                      size="lg"
                       asChild
                       className={`px-8 py-6 text-lg bg-gradient-to-r ${feature.gradient} border-0 hover:opacity-90 transition-all hover:scale-105 shadow-xl`}
                     >
@@ -322,8 +322,12 @@ const Welcome = () => {
               </div>
 
               {/* Decorative Elements */}
-              <div className={`absolute top-20 ${idx % 2 === 0 ? 'right-20' : 'left-20'} w-32 h-32 bg-gradient-to-r ${feature.gradient} rounded-full blur-3xl opacity-20`} />
-              <div className={`absolute bottom-20 ${idx % 2 === 0 ? 'left-20' : 'right-20'} w-48 h-48 bg-gradient-to-r ${feature.gradient} rounded-full blur-3xl opacity-15`} />
+              <div
+                className={`absolute top-20 ${idx % 2 === 0 ? "right-20" : "left-20"} w-32 h-32 bg-gradient-to-r ${feature.gradient} rounded-full blur-3xl opacity-20`}
+              />
+              <div
+                className={`absolute bottom-20 ${idx % 2 === 0 ? "left-20" : "right-20"} w-48 h-48 bg-gradient-to-r ${feature.gradient} rounded-full blur-3xl opacity-15`}
+              />
             </div>
           ))}
         </section>

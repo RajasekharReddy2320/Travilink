@@ -17,14 +17,10 @@ interface Particle {
 
 const icons = [Plane, Luggage, MapPin, Compass, Camera, Globe, Ticket, Map];
 const colors = [
-  'text-pink-400',
-  'text-cyan-400',
-  'text-purple-400',
-  'text-amber-400',
-  'text-emerald-400',
-  'text-blue-400',
-  'text-rose-400',
-  'text-indigo-400',
+  "hsl(var(--primary))",
+  "hsl(var(--accent))",
+  "hsl(var(--foreground))",
+  "hsl(var(--muted-foreground))",
 ];
 
 const FloatingParticles = () => {
@@ -59,11 +55,12 @@ const FloatingParticles = () => {
       {particles.map((particle) => (
         <div
           key={particle.id}
-          className={`absolute ${particle.color}`}
+          className="absolute"
           style={{
             left: `${particle.x}%`,
             top: `${particle.y}%`,
             opacity: particle.opacity,
+            color: particle.color,
             animation: `float-${particle.direction} ${particle.speed}s linear infinite`,
             animationDelay: `${particle.delay}s`,
           }}
@@ -72,7 +69,7 @@ const FloatingParticles = () => {
             size={particle.size}
             style={{
               transform: `rotate(${particle.rotation}deg)`,
-              filter: 'drop-shadow(0 0 10px currentColor)',
+              filter: "drop-shadow(0 0 10px currentColor)",
             }}
           />
         </div>

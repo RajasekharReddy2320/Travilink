@@ -12,13 +12,21 @@ export const useScrollAnimation = (options: UseScrollAnimationOptions = {}) => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+
+    // Ensure above-the-fold sections don't render "invisible" on first paint
+    const rect = node.getBoundingClientRect();
+    if (rect.top < window.innerHeight && rect.bottom > 0) {
+      setIsVisible(true);
+      if (triggerOnce) return;
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setIsVisible(true);
-          if (triggerOnce && ref.current) {
-            observer.unobserve(ref.current);
-          }
+          if (triggerOnce && ref.current) observer.unobserve(ref.current);
         } else if (!triggerOnce) {
           setIsVisible(false);
         }
@@ -26,9 +34,7 @@ export const useScrollAnimation = (options: UseScrollAnimationOptions = {}) => {
       { threshold, rootMargin }
     );
 
-    if (ref.current) {
-      observer.observe(ref.current);
-    }
+    observer.observe(node);
 
     return () => observer.disconnect();
   }, [threshold, rootMargin, triggerOnce]);
