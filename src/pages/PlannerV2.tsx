@@ -1,15 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import InputForm from "@/components/planner/InputForm";
 import ItineraryCard from "@/components/planner/ItineraryCard";
 import ItineraryMap from "@/components/planner/ItineraryMap";
 import PlannerCart from "@/components/planner/PlannerCart";
-import { TripParams, TripResponse, ItineraryStep, CartItem } from "@/types/tripPlanner";
+import { TripParams, TripResponse, ItineraryStep, CartItem, ItineraryHistoryItem } from "@/types/tripPlanner";
 import { supabase } from "@/integrations/supabase/client";
-import { AlertCircle, Sparkles, PlusCircle, Plane, ArrowLeft } from 'lucide-react';
+import { AlertCircle, Sparkles, PlusCircle, Plane, ArrowLeft, History, Share2, Trash2, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useCart } from '@/contexts/CartContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { SharePostDialog } from '@/components/SharePostDialog';
+
+const HISTORY_KEY = 'travexa_itinerary_history';
+
 const PlannerV2 = () => {
   const navigate = useNavigate();
   const { addToCart: addToGlobalCart } = useCart();
@@ -20,7 +27,49 @@ const PlannerV2 = () => {
   const [error, setError] = useState<string | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<ItineraryHistoryItem[]>([]);
+  const [showShareDialog, setShowShareDialog] = useState(false);
   const { toast } = useToast();
+
+  // Load history from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(HISTORY_KEY);
+    if (saved) {
+      try {
+        setHistory(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse history', e);
+      }
+    }
+  }, []);
+
+  const saveToHistory = (params: TripParams, response: TripResponse) => {
+    const newItem: ItineraryHistoryItem = {
+      id: Date.now().toString(),
+      params,
+      response,
+      createdAt: Date.now(),
+    };
+    const updatedHistory = [newItem, ...history].slice(0, 20); // Keep last 20
+    setHistory(updatedHistory);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updatedHistory));
+  };
+
+  const deleteFromHistory = (id: string) => {
+    const updatedHistory = history.filter(h => h.id !== id);
+    setHistory(updatedHistory);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updatedHistory));
+    toast({ title: "Deleted from history" });
+  };
+
+  const loadFromHistory = (item: ItineraryHistoryItem) => {
+    setTripData(item.response);
+    setTripDestination(item.params.destination);
+    setCurrentLocation(item.params.currentLocation);
+    setShowHistory(false);
+    toast({ title: "Loaded from history", description: item.response.title });
+  };
 
   const handleProceedToCheckout = () => {
     // Add all planner cart items to global cart
@@ -66,6 +115,10 @@ const PlannerV2 = () => {
       setTripData(data);
       setTripDestination(params.destination);
       setCurrentLocation(params.currentLocation);
+      
+      // Auto-save to history
+      saveToHistory(params, data);
+      
       toast({
         title: "Trip Generated!",
         description: `Your ${params.destination} itinerary is ready.`,
@@ -114,6 +167,27 @@ const PlannerV2 = () => {
     setCartItems(prev => prev.filter(item => item.id !== id));
   };
 
+  const shareItinerary = async () => {
+    if (!tripData) return;
+    
+    const shareText = `Check out my ${tripData.title} itinerary on TraveXa!\n\n${tripData.steps.map(s => `• ${s.title}`).join('\n')}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: tripData.title,
+          text: shareText,
+          url: window.location.href,
+        });
+      } catch (err) {
+        // User cancelled
+      }
+    } else {
+      await navigator.clipboard.writeText(shareText);
+      toast({ title: "Copied to clipboard!" });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -128,8 +202,70 @@ const PlannerV2 = () => {
               <h1 className="text-xl font-bold">Trip Planner</h1>
             </div>
           </div>
+          <Button variant="outline" size="sm" onClick={() => setShowHistory(true)}>
+            <History className="h-4 w-4 mr-2" />
+            History
+          </Button>
         </div>
       </header>
+
+      {/* History Dialog */}
+      <Dialog open={showHistory} onOpenChange={setShowHistory}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Trip History
+            </DialogTitle>
+            <DialogDescription>
+              Your recently generated itineraries
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[400px]">
+            {history.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <History className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                <p>No history yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {history.map((item) => (
+                  <Card key={item.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1" onClick={() => loadFromHistory(item)}>
+                          <h4 className="font-semibold">{item.response.title}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {item.params.currentLocation} → {item.params.destination}
+                            {item.params.destinations && item.params.destinations.length > 1 && 
+                              ` (+${item.params.destinations.length - 1} more)`}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(item.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteFromHistory(item.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       <main className="pb-20">
         <div className="max-w-5xl mx-auto px-6 py-10">
@@ -173,15 +309,25 @@ const PlannerV2 = () => {
                 </h2>
                 <p className="text-muted-foreground mb-6">Here is your curated itinerary</p>
                 
-                {/* Add All Button */}
-                <Button
-                  onClick={handleAddAll}
-                  variant="secondary"
-                  className="inline-flex items-center gap-2"
-                >
-                  <PlusCircle size={16} />
-                  Add All Paid Items to Cart
-                </Button>
+                {/* Action Buttons */}
+                <div className="flex justify-center gap-3 flex-wrap">
+                  <Button
+                    onClick={handleAddAll}
+                    variant="secondary"
+                    className="inline-flex items-center gap-2"
+                  >
+                    <PlusCircle size={16} />
+                    Add All Paid Items to Cart
+                  </Button>
+                  <Button
+                    onClick={shareItinerary}
+                    variant="outline"
+                    className="inline-flex items-center gap-2"
+                  >
+                    <Share2 size={16} />
+                    Share Itinerary
+                  </Button>
+                </div>
               </div>
 
               {/* Interactive Map with all stops */}
