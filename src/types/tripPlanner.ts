@@ -1,11 +1,13 @@
 export interface TripParams {
   currentLocation: string;
   destination: string;
+  destinations?: string[]; // Multiple destinations support
   startDate: string;
   endDate: string;
   travelers: number;
-  budget: string;
-  interests: string[];
+  budget?: string; // Made optional
+  interests?: string[]; // Made optional
+  planMode?: 'tickets' | 'sightseeing' | 'full';
 }
 
 export interface ItineraryStep {
@@ -31,4 +33,11 @@ export interface TripResponse {
 
 export interface CartItem extends ItineraryStep {
   addedAt: number;
+}
+
+export interface ItineraryHistoryItem {
+  id: string;
+  params: TripParams;
+  response: TripResponse;
+  createdAt: number;
 }

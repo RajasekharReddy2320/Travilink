@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Users, Wallet, MapPin, Loader2, X, Ticket, Map, Sparkles } from 'lucide-react';
+import { Calendar, Users, Wallet, MapPin, Loader2, X, Ticket, Map, Sparkles, Plus } from 'lucide-react';
 
 interface InputFormProps {
-  onSubmit: (params: TripParams & { planMode: 'tickets' | 'sightseeing' | 'full' }) => void;
+  onSubmit: (params: TripParams) => void;
   isLoading: boolean;
 }
 
@@ -21,11 +21,12 @@ const budgetOptions = ['Budget', 'Mid-Range', 'Luxury'];
 const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
   const [currentLocation, setCurrentLocation] = useState('');
   const [destination, setDestination] = useState('');
+  const [additionalDestinations, setAdditionalDestinations] = useState<string[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [travelers, setTravelers] = useState(2);
-  const [budget, setBudget] = useState('Mid-Range');
-  const [interests, setInterests] = useState<string[]>(['Culture', 'Food']);
+  const [budget, setBudget] = useState('');
+  const [interests, setInterests] = useState<string[]>([]);
   const [planMode, setPlanMode] = useState<'tickets' | 'sightseeing' | 'full'>('full');
 
   const toggleInterest = (interest: string) => {
@@ -36,10 +37,39 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
     );
   };
 
+  const addDestination = () => {
+    setAdditionalDestinations(prev => [...prev, '']);
+  };
+
+  const updateDestination = (index: number, value: string) => {
+    setAdditionalDestinations(prev => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
+    });
+  };
+
+  const removeDestination = (index: number) => {
+    setAdditionalDestinations(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentLocation || !destination || !startDate || !endDate) return;
-    onSubmit({ currentLocation, destination, startDate, endDate, travelers, budget, interests, planMode });
+    
+    const allDestinations = [destination, ...additionalDestinations.filter(d => d.trim())];
+    
+    onSubmit({ 
+      currentLocation, 
+      destination: allDestinations[0],
+      destinations: allDestinations.length > 1 ? allDestinations : undefined,
+      startDate, 
+      endDate, 
+      travelers, 
+      budget: budget || undefined,
+      interests: interests.length > 0 ? interests : undefined,
+      planMode 
+    });
   };
 
   return (
@@ -151,20 +181,55 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
         />
       </div>
 
-      {/* Destination */}
+      {/* Destination with Multi-Destination Support */}
       <div className="mb-6">
         <Label className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
           <MapPin size={16} className="text-destructive" />
           Destination
         </Label>
-        <Input
-          type="text"
-          placeholder="e.g., Paris, France"
-          value={destination}
-          onChange={(e) => setDestination(e.target.value)}
-          className="bg-background rounded-xl"
-          required
-        />
+        <div className="space-y-3">
+          <Input
+            type="text"
+            placeholder="e.g., Paris, France"
+            value={destination}
+            onChange={(e) => setDestination(e.target.value)}
+            className="bg-background rounded-xl"
+            required
+          />
+          
+          {/* Additional Destinations */}
+          {additionalDestinations.map((dest, index) => (
+            <div key={index} className="flex gap-2">
+              <Input
+                type="text"
+                placeholder={`Stop ${index + 2}: e.g., Rome, Italy`}
+                value={dest}
+                onChange={(e) => updateDestination(index, e.target.value)}
+                className="bg-background rounded-xl flex-1"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => removeDestination(index)}
+                className="shrink-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+          
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addDestination}
+            className="w-full rounded-xl border-dashed"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Another Destination
+          </Button>
+        </div>
       </div>
 
       {/* Dates */}
@@ -226,11 +291,11 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
         </div>
       </div>
 
-      {/* Budget */}
+      {/* Budget - Optional */}
       <div className="mb-6">
         <Label className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
           <Wallet size={16} className="text-primary" />
-          Budget Level
+          Budget Level <span className="text-xs text-muted-foreground">(optional)</span>
         </Label>
         <div className="flex gap-2">
           {budgetOptions.map((option) => (
@@ -240,7 +305,7 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
               variant={budget === option ? "default" : "outline"}
               size="sm"
               className="rounded-xl"
-              onClick={() => setBudget(option)}
+              onClick={() => setBudget(budget === option ? '' : option)}
             >
               {option}
             </Button>
@@ -248,11 +313,11 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
         </div>
       </div>
 
-      {/* Interests - Only show for sightseeing or full mode */}
+      {/* Interests - Only show for sightseeing or full mode, optional */}
       {(planMode === 'sightseeing' || planMode === 'full') && (
         <div className="mb-8">
           <Label className="text-sm font-semibold text-foreground mb-3 block">
-            Interests
+            Interests <span className="text-xs text-muted-foreground">(optional)</span>
           </Label>
           <div className="flex flex-wrap gap-2">
             {interestOptions.map((interest) => (

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -11,7 +10,7 @@ import DashboardNav from "@/components/DashboardNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PostCard } from "@/components/PostCard";
 import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, Users, Bookmark, Search, Send, UserCheck, UserPlus, Clock, X, Check } from "lucide-react";
+import { MessageSquare, Users, Bookmark, Search, Send, UserCheck, UserPlus, Clock, X, Check, Rss, Palette } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { z } from "zod";
 
@@ -64,11 +63,23 @@ interface Conversation {
   unreadCount: number;
 }
 
+const MESSAGE_THEMES = [
+  { id: 'default', name: 'Default', primary: 'bg-primary', secondary: 'bg-muted' },
+  { id: 'ocean', name: 'Ocean', primary: 'bg-blue-500', secondary: 'bg-blue-100' },
+  { id: 'forest', name: 'Forest', primary: 'bg-green-600', secondary: 'bg-green-100' },
+  { id: 'sunset', name: 'Sunset', primary: 'bg-orange-500', secondary: 'bg-orange-100' },
+  { id: 'purple', name: 'Purple', primary: 'bg-purple-600', secondary: 'bg-purple-100' },
+  { id: 'rose', name: 'Rose', primary: 'bg-pink-500', secondary: 'bg-pink-100' },
+];
+
 const Explore = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'feed' | 'connections' | 'messages' | 'saved'>('feed');
+  const [messageTheme, setMessageTheme] = useState('default');
+  const [showThemePicker, setShowThemePicker] = useState(false);
   
   // Posts state
   const [posts, setPosts] = useState<Post[]>([]);
@@ -361,6 +372,8 @@ const Explore = () => {
     user.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const currentTheme = MESSAGE_THEMES.find(t => t.id === messageTheme) || MESSAGE_THEMES[0];
+
   // Realtime subscriptions
   useEffect(() => {
     if (!currentUserId) return;
@@ -396,6 +409,13 @@ const Explore = () => {
     );
   }
 
+  const tabs = [
+    { id: 'feed' as const, label: 'Feed', icon: Rss },
+    { id: 'connections' as const, label: 'Connections', icon: Users, badge: pendingReceived.length },
+    { id: 'messages' as const, label: 'Messages', icon: MessageSquare },
+    { id: 'saved' as const, label: 'Saved', icon: Bookmark },
+  ];
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav />
@@ -405,60 +425,75 @@ const Explore = () => {
           <CreatePostDialog onPostCreated={handlePostUpdate} />
         </div>
 
-        <Tabs defaultValue="feed" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8">
-            <TabsTrigger value="feed">Feed</TabsTrigger>
-            <TabsTrigger value="connections" className="flex items-center gap-1">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Connections</span>
-              {pendingReceived.length > 0 && (
-                <span className="ml-1 bg-accent text-accent-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {pendingReceived.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="messages" className="flex items-center gap-1">
-              <MessageSquare className="h-4 w-4" />
-              <span className="hidden sm:inline">Messages</span>
-            </TabsTrigger>
-            <TabsTrigger value="saved" className="flex items-center gap-1">
-              <Bookmark className="h-4 w-4" />
-              <span className="hidden sm:inline">Saved</span>
-            </TabsTrigger>
-          </TabsList>
+        <div className="flex gap-6">
+          {/* Vertical Sidebar Tabs */}
+          <div className="w-16 md:w-48 shrink-0">
+            <div className="sticky top-24 space-y-2">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${
+                      activeTab === tab.id
+                        ? 'bg-primary text-primary-foreground shadow-lg'
+                        : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span className="hidden md:inline font-medium">{tab.label}</span>
+                    {tab.badge && tab.badge > 0 && (
+                      <span className="ml-auto bg-accent text-accent-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {tab.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-          {/* Feed Tab */}
-          <TabsContent value="feed" className="space-y-6">
-            {posts.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No posts yet. Be the first to share your travel story!</p>
+          {/* Main Content Area */}
+          <div className="flex-1 min-w-0">
+            {/* Feed Tab */}
+            {activeTab === 'feed' && (
+              <div className="space-y-6">
+                {posts.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-muted-foreground">No posts yet. Be the first to share your travel story!</p>
+                  </div>
+                ) : (
+                  posts.map((post) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      currentUserId={currentUserId!}
+                      userLiked={userLikes.has(post.id)}
+                      userSaved={userSaves.has(post.id)}
+                      onUpdate={handlePostUpdate}
+                    />
+                  ))
+                )}
               </div>
-            ) : (
-              posts.map((post) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  currentUserId={currentUserId!}
-                  userLiked={userLikes.has(post.id)}
-                  userSaved={userSaves.has(post.id)}
-                  onUpdate={handlePostUpdate}
-                />
-              ))
             )}
-          </TabsContent>
 
-          {/* Connections Tab */}
-          <TabsContent value="connections" className="space-y-6">
-            <Tabs defaultValue="connected" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="connected">Connected ({connections.length})</TabsTrigger>
-                <TabsTrigger value="requests">
-                  Requests ({pendingReceived.length})
-                </TabsTrigger>
-                <TabsTrigger value="sent">Sent ({pendingSent.length})</TabsTrigger>
-              </TabsList>
+            {/* Connections Tab */}
+            {activeTab === 'connections' && (
+              <div className="space-y-6">
+                {/* Connection Sub-tabs */}
+                <div className="flex gap-2 border-b pb-4">
+                  <Button variant="outline" size="sm" className="rounded-full">
+                    Connected ({connections.length})
+                  </Button>
+                  <Button variant="ghost" size="sm" className="rounded-full">
+                    Requests ({pendingReceived.length})
+                  </Button>
+                  <Button variant="ghost" size="sm" className="rounded-full">
+                    Sent ({pendingSent.length})
+                  </Button>
+                </div>
 
-              <TabsContent value="connected" className="mt-4">
                 {connections.length === 0 ? (
                   <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12">
@@ -490,9 +525,7 @@ const Explore = () => {
                             <div className="flex gap-2">
                               <Button variant="outline" size="sm" onClick={() => {
                                 setSelectedUser(otherUser || null);
-                                // Switch to messages tab
-                                const messagesTab = document.querySelector('[value="messages"]') as HTMLButtonElement;
-                                messagesTab?.click();
+                                setActiveTab('messages');
                               }}>
                                 <MessageSquare className="h-4 w-4 mr-1" />
                                 Message
@@ -507,230 +540,214 @@ const Explore = () => {
                     })}
                   </div>
                 )}
-              </TabsContent>
 
-              <TabsContent value="requests" className="mt-4">
-                {pendingReceived.length === 0 ? (
-                  <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                      <UserPlus className="h-12 w-12 text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">No pending requests</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="grid gap-4">
-                    {pendingReceived.map((request) => (
-                      <Card key={request.id}>
-                        <CardContent className="flex items-center justify-between p-4">
-                          <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate(`/profile/${request.requester?.id}`)}>
-                            <Avatar className="h-12 w-12">
-                              <AvatarImage src={request.requester?.avatar_url || undefined} />
-                              <AvatarFallback>{getInitials(request.requester?.full_name || null)}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <h3 className="font-semibold hover:underline">{request.requester?.full_name || "User"}</h3>
-                              <p className="text-sm text-muted-foreground">Wants to connect</p>
+                {/* Pending Requests */}
+                {pendingReceived.length > 0 && (
+                  <div className="mt-8">
+                    <h3 className="font-semibold mb-4">Pending Requests</h3>
+                    <div className="grid gap-4">
+                      {pendingReceived.map((request) => (
+                        <Card key={request.id}>
+                          <CardContent className="flex items-center justify-between p-4">
+                            <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate(`/profile/${request.requester?.id}`)}>
+                              <Avatar className="h-12 w-12">
+                                <AvatarImage src={request.requester?.avatar_url || undefined} />
+                                <AvatarFallback>{getInitials(request.requester?.full_name || null)}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <h3 className="font-semibold hover:underline">{request.requester?.full_name || "User"}</h3>
+                                <p className="text-sm text-muted-foreground">Wants to connect</p>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={() => acceptConnection(request.id)}>
-                              <Check className="h-4 w-4 mr-1" /> Accept
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => rejectConnection(request.id)}>
-                              <X className="h-4 w-4 mr-1" /> Decline
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => acceptConnection(request.id)}>
+                                <Check className="h-4 w-4 mr-1" /> Accept
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => rejectConnection(request.id)}>
+                                <X className="h-4 w-4 mr-1" /> Decline
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   </div>
                 )}
-              </TabsContent>
+              </div>
+            )}
 
-              <TabsContent value="sent" className="mt-4">
-                {pendingSent.length === 0 ? (
-                  <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                      <Clock className="h-12 w-12 text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">No sent requests</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="grid gap-4">
-                    {pendingSent.map((request) => (
-                      <Card key={request.id}>
-                        <CardContent className="flex items-center justify-between p-4">
-                          <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate(`/profile/${request.addressee?.id}`)}>
-                            <Avatar className="h-12 w-12">
-                              <AvatarImage src={request.addressee?.avatar_url || undefined} />
-                              <AvatarFallback>{getInitials(request.addressee?.full_name || null)}</AvatarFallback>
+            {/* Messages Tab */}
+            {activeTab === 'messages' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-250px)] min-h-[500px]">
+                <Card className="md:col-span-1">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5" /> Conversations
+                    </CardTitle>
+                    <div className="relative mt-2">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                      <Input
+                        placeholder="Search users..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <ScrollArea className="h-[400px]">
+                      {searchQuery ? (
+                        filteredUsers.map((user) => (
+                          <div
+                            key={user.id}
+                            className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 border-b ${selectedUser?.id === user.id ? "bg-muted" : ""}`}
+                            onClick={() => { setSelectedUser(user); setSearchQuery(""); }}
+                          >
+                            <Avatar>
+                              <AvatarImage src={user.avatar_url || undefined} />
+                              <AvatarFallback>{getInitials(user.full_name)}</AvatarFallback>
                             </Avatar>
-                            <div>
-                              <h3 className="font-semibold hover:underline">{request.addressee?.full_name || "User"}</h3>
-                              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                <Clock className="h-3 w-3" /> Pending
-                              </p>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{user.full_name || "User"}</p>
+                              <p className="text-sm text-muted-foreground">Start a conversation</p>
                             </div>
                           </div>
-                          <Button variant="outline" size="sm" onClick={() => rejectConnection(request.id)}>
-                            Cancel
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </TabsContent>
-
-          {/* Messages Tab */}
-          <TabsContent value="messages">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-300px)] min-h-[500px]">
-              <Card className="md:col-span-1">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5" /> Conversations
-                  </CardTitle>
-                  <div className="relative mt-2">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                    <Input
-                      placeholder="Search users..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <ScrollArea className="h-[400px]">
-                    {searchQuery ? (
-                      filteredUsers.map((user) => (
-                        <div
-                          key={user.id}
-                          className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 border-b ${selectedUser?.id === user.id ? "bg-muted" : ""}`}
-                          onClick={() => { setSelectedUser(user); setSearchQuery(""); }}
-                        >
-                          <Avatar>
-                            <AvatarImage src={user.avatar_url || undefined} />
-                            <AvatarFallback>{getInitials(user.full_name)}</AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{user.full_name || "User"}</p>
-                            <p className="text-sm text-muted-foreground">Start a conversation</p>
-                          </div>
-                        </div>
-                      ))
-                    ) : conversations.length > 0 ? (
-                      conversations.map((convo) => (
-                        <div
-                          key={convo.user.id}
-                          className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 border-b ${selectedUser?.id === convo.user.id ? "bg-muted" : ""}`}
-                          onClick={() => setSelectedUser(convo.user)}
-                        >
-                          <Avatar>
-                            <AvatarImage src={convo.user.avatar_url || undefined} />
-                            <AvatarFallback>{getInitials(convo.user.full_name)}</AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <p className="font-medium truncate">{convo.user.full_name || "User"}</p>
-                              {convo.unreadCount > 0 && (
-                                <span className="bg-accent text-accent-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                  {convo.unreadCount}
-                                </span>
+                        ))
+                      ) : conversations.length > 0 ? (
+                        conversations.map((convo) => (
+                          <div
+                            key={convo.user.id}
+                            className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 border-b ${selectedUser?.id === convo.user.id ? "bg-muted" : ""}`}
+                            onClick={() => setSelectedUser(convo.user)}
+                          >
+                            <Avatar>
+                              <AvatarImage src={convo.user.avatar_url || undefined} />
+                              <AvatarFallback>{getInitials(convo.user.full_name)}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <p className="font-medium truncate">{convo.user.full_name || "User"}</p>
+                                {convo.unreadCount > 0 && (
+                                  <span className="bg-accent text-accent-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                    {convo.unreadCount}
+                                  </span>
+                                )}
+                              </div>
+                              {convo.lastMessage && (
+                                <p className="text-sm text-muted-foreground truncate">{convo.lastMessage.content}</p>
                               )}
                             </div>
-                            {convo.lastMessage && (
-                              <p className="text-sm text-muted-foreground truncate">{convo.lastMessage.content}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-12 px-4">
+                          <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                          <p className="text-muted-foreground">No conversations yet</p>
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+
+                <Card className="md:col-span-2 flex flex-col">
+                  {selectedUser ? (
+                    <>
+                      <CardHeader className="border-b py-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="cursor-pointer" onClick={() => navigate(`/profile/${selectedUser.id}`)}>
+                              <AvatarImage src={selectedUser.avatar_url || undefined} />
+                              <AvatarFallback>{getInitials(selectedUser.full_name)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <CardTitle className="text-lg">{selectedUser.full_name || "User"}</CardTitle>
+                              <CardDescription>Active now</CardDescription>
+                            </div>
+                          </div>
+                          <div className="relative">
+                            <Button variant="ghost" size="icon" onClick={() => setShowThemePicker(!showThemePicker)}>
+                              <Palette className="h-4 w-4" />
+                            </Button>
+                            {showThemePicker && (
+                              <div className="absolute right-0 top-full mt-2 bg-card border rounded-lg shadow-lg p-2 z-10">
+                                <p className="text-xs text-muted-foreground mb-2 px-2">Chat Theme</p>
+                                <div className="flex gap-1">
+                                  {MESSAGE_THEMES.map((theme) => (
+                                    <button
+                                      key={theme.id}
+                                      onClick={() => { setMessageTheme(theme.id); setShowThemePicker(false); }}
+                                      className={`w-8 h-8 rounded-full ${theme.primary} ${messageTheme === theme.id ? 'ring-2 ring-offset-2 ring-primary' : ''}`}
+                                      title={theme.name}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
                             )}
                           </div>
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-12 px-4">
-                        <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                        <p className="text-muted-foreground">No conversations yet</p>
-                      </div>
-                    )}
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-
-              <Card className="md:col-span-2 flex flex-col">
-                {selectedUser ? (
-                  <>
-                    <CardHeader className="border-b py-3">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="cursor-pointer" onClick={() => navigate(`/profile/${selectedUser.id}`)}>
-                          <AvatarImage src={selectedUser.avatar_url || undefined} />
-                          <AvatarFallback>{getInitials(selectedUser.full_name)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <CardTitle className="text-lg">{selectedUser.full_name || "User"}</CardTitle>
-                          <CardDescription>Active now</CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex-1 p-0">
+                        <ScrollArea className="h-[300px] p-4">
+                          {messages.map((msg) => (
+                            <div key={msg.id} className={`mb-4 flex ${msg.sender_id === currentUserId ? "justify-end" : "justify-start"}`}>
+                              <div className={`max-w-[70%] rounded-lg p-3 ${msg.sender_id === currentUserId ? `${currentTheme.primary} text-white` : currentTheme.secondary}`}>
+                                <p className="text-sm">{msg.content}</p>
+                                <p className="text-xs mt-1 opacity-70">{format(new Date(msg.created_at), "h:mm a")}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </ScrollArea>
+                      </CardContent>
+                      <div className="p-4 border-t">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Type a message..."
+                            value={messageText}
+                            onChange={(e) => setMessageText(e.target.value)}
+                            onKeyPress={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                          />
+                          <Button onClick={sendMessage} disabled={!messageText.trim()}>
+                            <Send className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                    </CardHeader>
-                    <CardContent className="flex-1 p-0">
-                      <ScrollArea className="h-[300px] p-4">
-                        {messages.map((msg) => (
-                          <div key={msg.id} className={`mb-4 flex ${msg.sender_id === currentUserId ? "justify-end" : "justify-start"}`}>
-                            <div className={`max-w-[70%] rounded-lg p-3 ${msg.sender_id === currentUserId ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                              <p className="text-sm">{msg.content}</p>
-                              <p className="text-xs mt-1 opacity-70">{format(new Date(msg.created_at), "h:mm a")}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </ScrollArea>
-                    </CardContent>
-                    <div className="p-4 border-t">
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Type a message..."
-                          value={messageText}
-                          onChange={(e) => setMessageText(e.target.value)}
-                          onKeyPress={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                        />
-                        <Button onClick={sendMessage} disabled={!messageText.trim()}>
-                          <Send className="h-4 w-4" />
-                        </Button>
+                    </>
+                  ) : (
+                    <CardContent className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <MessageSquare className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                        <p className="text-lg text-muted-foreground">Select a conversation</p>
                       </div>
-                    </div>
-                  </>
-                ) : (
-                  <CardContent className="flex-1 flex items-center justify-center">
-                    <div className="text-center">
-                      <MessageSquare className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                      <p className="text-lg text-muted-foreground">Select a conversation</p>
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Saved Tab */}
-          <TabsContent value="saved" className="space-y-6">
-            {posts.filter(p => userSaves.has(p.id)).length === 0 ? (
-              <div className="text-center py-12">
-                <Bookmark className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">No saved posts yet</p>
+                    </CardContent>
+                  )}
+                </Card>
               </div>
-            ) : (
-              posts.filter(p => userSaves.has(p.id)).map((post) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  currentUserId={currentUserId!}
-                  userLiked={userLikes.has(post.id)}
-                  userSaved={userSaves.has(post.id)}
-                  onUpdate={handlePostUpdate}
-                />
-              ))
             )}
-          </TabsContent>
-        </Tabs>
+
+            {/* Saved Tab */}
+            {activeTab === 'saved' && (
+              <div className="space-y-6">
+                {posts.filter(p => userSaves.has(p.id)).length === 0 ? (
+                  <div className="text-center py-12">
+                    <Bookmark className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground">No saved posts yet</p>
+                  </div>
+                ) : (
+                  posts.filter(p => userSaves.has(p.id)).map((post) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      currentUserId={currentUserId!}
+                      userLiked={userLikes.has(post.id)}
+                      userSaved={userSaves.has(post.id)}
+                      onUpdate={handlePostUpdate}
+                    />
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
