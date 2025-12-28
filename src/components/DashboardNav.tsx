@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Search, User, Plane, Compass, UserCheck, Ticket, ShoppingCart, Menu, X } from "lucide-react";
+import { Search, User, Plane, Compass, Ticket, ShoppingCart, Menu, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -68,18 +68,6 @@ const DashboardNav = () => {
             >
               <Compass className="h-3.5 w-3.5 lg:h-4 lg:w-4 shrink-0" />
               <span className="hidden lg:inline-block">Explore</span>
-            </Link>
-
-            <Link
-              to="/travel-buddies"
-              className={`flex items-center gap-1 px-1.5 lg:px-2 py-2 rounded-md transition-colors whitespace-nowrap ${
-                isActive("/travel-buddies")
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-muted"
-              }`}
-            >
-              <UserCheck className="h-3.5 w-3.5 lg:h-4 lg:w-4 shrink-0" />
-              <span className="hidden lg:inline-block">Travel Buddies</span>
             </Link>
 
             <Link
