@@ -2,79 +2,11 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import FeaturedTrips from "@/components/FeaturedTrips";
 import { Plane, Sparkles, MapPin, Users, Ticket, Zap, Shield, Globe } from "lucide-react";
-import { motion, useTransform, useScroll } from "framer-motion";
 
-// --- New Component: Horizontal Scroll Section ---
-const HorizontalScrollSection = ({ features }: { features: any[] }) => {
-  const targetRef = useRef<HTMLDivElement>(null);
-
-  // Track the scroll progress of this specific section (0 to 1)
-  const { scrollYProgress } = useScroll({
-    target: targetRef,
-  });
-
-  // Map vertical scroll (0 to 1) to horizontal movement (1% to -95%)
-  // We use -95% so the last card doesn't disappear completely off-screen
-  const x = useTransform(scrollYProgress, [0, 1], ["1%", "-95%"]);
-
-  return (
-    // This section is 300vh tall to allow ample scroll distance
-    <section ref={targetRef} className="relative h-[300vh] bg-background/50">
-      {/* The sticky container locks the view in place while we scroll "through" the 300vh */}
-      <div className="sticky top-0 flex h-screen items-center overflow-hidden">
-        {/* Title pinned to top left */}
-        <div className="absolute top-10 left-10 z-20 max-w-md">
-          <Badge variant="secondary" className="mb-4 bg-background/60 backdrop-blur-xl border border-border/50">
-            Features
-          </Badge>
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">Why Choose Travexa?</h2>
-          <p className="text-muted-foreground text-lg">Scroll down to explore our features</p>
-        </div>
-
-        {/* The Horizontal Moving Track */}
-        <motion.div style={{ x }} className="flex gap-8 pl-10 md:pl-20">
-          {features.map((feature, index) => (
-            <Card
-              key={index}
-              className="group relative h-[400px] w-[350px] md:w-[450px] shrink-0 overflow-hidden bg-card/50 backdrop-blur-xl border-border/50 transition-all duration-500 hover:border-primary/50"
-            >
-              {/* Hover Glow Effect */}
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-                <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-primary/10" />
-              </div>
-
-              <CardContent className="flex h-full flex-col justify-between p-8 relative z-10">
-                <div>
-                  <div className="text-6xl mb-6 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
-                    {feature.emoji}
-                  </div>
-                  <h3 className="text-2xl font-bold mb-4 transition-colors duration-300 group-hover:text-accent">
-                    {feature.title}
-                  </h3>
-                  <p className="text-lg text-muted-foreground leading-relaxed">{feature.description}</p>
-                </div>
-                <div className="flex items-center gap-2 text-sm font-medium text-primary opacity-0 transform translate-y-4 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0">
-                  Learn more <div className="h-1 w-1 bg-primary rounded-full" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </motion.div>
-
-        {/* Progress Bar Synced to Scroll */}
-        <div className="absolute bottom-10 left-10 right-10 h-2 bg-secondary rounded-full overflow-hidden">
-          <motion.div className="h-full bg-primary" style={{ scaleX: scrollYProgress, transformOrigin: "0%" }} />
-        </div>
-      </div>
-    </section>
-  );
-};
-
-// --- Main Index Component ---
 const Index = () => {
   const navigate = useNavigate();
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -152,7 +84,7 @@ const Index = () => {
     <div
       ref={containerRef}
       onMouseMove={handleMouseMove}
-      className="min-h-screen bg-background relative overflow-x-hidden"
+      className="min-h-screen bg-background relative overflow-hidden"
     >
       {/* Animated Background Gradient */}
       <div
@@ -171,6 +103,28 @@ const Index = () => {
           `,
         }}
       />
+
+      {/* Floating Orbs */}
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div
+          className="absolute w-96 h-96 rounded-full blur-3xl opacity-20 animate-pulse"
+          style={{
+            background: "radial-gradient(circle, hsl(210 50% 50%), transparent)",
+            left: `${mousePosition.x * 0.5}%`,
+            top: `${mousePosition.y * 0.3}%`,
+            transition: "left 0.8s ease-out, top 0.8s ease-out",
+          }}
+        />
+        <div
+          className="absolute w-72 h-72 rounded-full blur-3xl opacity-15"
+          style={{
+            background: "radial-gradient(circle, hsl(280 50% 60%), transparent)",
+            right: `${(100 - mousePosition.x) * 0.4}%`,
+            bottom: `${(100 - mousePosition.y) * 0.4}%`,
+            transition: "right 1s ease-out, bottom 1s ease-out",
+          }}
+        />
+      </div>
 
       {/* Header */}
       <header className="relative z-50 border-b border-border/50 bg-background/60 backdrop-blur-xl sticky top-0">
@@ -234,7 +188,7 @@ const Index = () => {
             place.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-20">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
               size="lg"
               className="px-10 py-6 text-lg shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-105"
@@ -256,8 +210,43 @@ const Index = () => {
           </div>
         </section>
 
-        {/* --- REPLACED: Horizontal Scrolling Features Section --- */}
-        <HorizontalScrollSection features={features} />
+        {/* Features Section */}
+        <section className="container mx-auto px-6 py-20 max-w-6xl">
+          <div className="text-center mb-16">
+            <Badge variant="secondary" className="mb-4 bg-background/60 backdrop-blur-xl border border-border/50">
+              Features
+            </Badge>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">Why Choose Travexa?</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+              Your all-in-one travel companion that revolutionizes how you plan, book, and experience your journeys
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map((feature, index) => (
+              <Card
+                key={index}
+                className="group relative overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl bg-card/50 backdrop-blur-xl border-border/50"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                {/* Hover Glow Effect */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+                  <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-primary/10" />
+                </div>
+
+                <CardContent className="p-8 relative z-10">
+                  <div className="text-5xl mb-5 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
+                    {feature.emoji}
+                  </div>
+                  <h3 className="text-xl font-semibold mb-3 transition-colors duration-300 group-hover:text-accent">
+                    {feature.title}
+                  </h3>
+                  <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
 
         {/* Featured Trips */}
         <FeaturedTrips />
@@ -265,6 +254,7 @@ const Index = () => {
         {/* Feedback Section */}
         <section className="container mx-auto px-6 py-24 max-w-4xl">
           <Card className="relative overflow-hidden border-2 border-accent/20 bg-gradient-to-br from-accent/5 via-background to-primary/5 backdrop-blur-xl shadow-2xl">
+            {/* Decorative Elements */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-accent/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
 
