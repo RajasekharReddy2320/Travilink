@@ -335,11 +335,98 @@ export default function BookingHub() {
           )
         )}
 
-        {/* Coming Soon sections */}
+        {/* Coming Soon sections - Developers see placeholder for dev features */}
         {activeSection === 'metro' && renderComingSoon('Metro', '🚇')}
-        {activeSection === 'buses' && renderComingSoon('Buses', '🚌')}
-        {activeSection === 'hotels' && renderComingSoon('Hotels', '🏨')}
-        {activeSection === 'cabs' && renderComingSoon('Cabs', '🚕')}
+        {activeSection === 'buses' && (
+          isDeveloperLoading ? (
+            <Card className="border-dashed">
+              <CardContent className="p-12 text-center">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
+              </CardContent>
+            </Card>
+          ) : isDeveloper ? (
+            <Card className="border-2 border-dashed border-amber-300 bg-amber-50/50">
+              <CardContent className="p-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-medium">Developer Preview</span>
+                </div>
+                <div className="text-center py-8">
+                  <Bus className="h-16 w-16 mx-auto mb-4 text-amber-600" />
+                  <h3 className="text-xl font-semibold mb-2">Bus Booking - Developer Preview</h3>
+                  <p className="text-muted-foreground mb-4">This feature is under development. Search functionality coming soon.</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Route Search</span>
+                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Seat Selection</span>
+                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Live Tracking</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            renderComingSoon('Buses', '🚌')
+          )
+        )}
+        {activeSection === 'hotels' && (
+          isDeveloperLoading ? (
+            <Card className="border-dashed">
+              <CardContent className="p-12 text-center">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
+              </CardContent>
+            </Card>
+          ) : isDeveloper ? (
+            <Card className="border-2 border-dashed border-amber-300 bg-amber-50/50">
+              <CardContent className="p-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-medium">Developer Preview</span>
+                </div>
+                <div className="text-center py-8">
+                  <Hotel className="h-16 w-16 mx-auto mb-4 text-amber-600" />
+                  <h3 className="text-xl font-semibold mb-2">Hotel Booking - Developer Preview</h3>
+                  <p className="text-muted-foreground mb-4">This feature is under development. Search functionality coming soon.</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Room Search</span>
+                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Price Comparison</span>
+                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Reviews</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            renderComingSoon('Hotels', '🏨')
+          )
+        )}
+        {activeSection === 'cabs' && (
+          isDeveloperLoading ? (
+            <Card className="border-dashed">
+              <CardContent className="p-12 text-center">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
+              </CardContent>
+            </Card>
+          ) : isDeveloper ? (
+            <Card className="border-2 border-dashed border-amber-300 bg-amber-50/50">
+              <CardContent className="p-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-medium">Developer Preview</span>
+                </div>
+                <div className="text-center py-8">
+                  <Car className="h-16 w-16 mx-auto mb-4 text-amber-600" />
+                  <h3 className="text-xl font-semibold mb-2">Cab Booking - Developer Preview</h3>
+                  <p className="text-muted-foreground mb-4">This feature is under development. Ride booking coming soon.</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Ride Booking</span>
+                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Live Tracking</span>
+                    <span className="px-3 py-1 bg-muted rounded-full text-sm">Fare Estimate</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            renderComingSoon('Cabs', '🚕')
+          )
+        )}
 
         {/* Search Form - Only for flights or trains when search is active (trains requires developer mode) */}
         {(activeSection === 'flights' || (activeSection === 'trains' && showSearchForm && isDeveloper)) && (
