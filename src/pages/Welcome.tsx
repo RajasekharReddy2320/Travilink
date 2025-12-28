@@ -6,14 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import FeaturedTrips from "@/components/FeaturedTrips";
 import FloatingParticles from "@/components/FloatingParticles";
-// Make sure this file exists (code provided below)
 import HorizontalScrollFeatures from "@/components/HorizontalScrollFeatures";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-// ADDED: Missing icons for the features list
-import { Plane, Sparkles, Globe, ChevronDown, Ticket, Shield, Users, Zap } from "lucide-react";
-
+import { Plane, Sparkles, Globe, ChevronDown } from "lucide-react";
 const RealisticGlobe = lazy(() => import("@/components/RealisticGlobe"));
-
+// Ensure this array passes the actual Lucide components, not just names
+const features = [
+  { icon: Sparkles, title: "AI-Powered Planning", description: "...", emoji: "🤖" },
+  { icon: Ticket, title: "Unified Booking", description: "...", emoji: "🎫" },
+  // ... etc
+];
 const AnimatedSection = ({
   children,
   className = "",
@@ -23,7 +25,9 @@ const AnimatedSection = ({
   className?: string;
   delay?: number;
 }) => {
-  const { ref, isVisible } = useScrollAnimation({ threshold: 0.2 });
+  const { ref, isVisible } = useScrollAnimation({
+    threshold: 0.2,
+  });
   return (
     <div
       ref={ref}
@@ -38,70 +42,29 @@ const AnimatedSection = ({
     </div>
   );
 };
-
 const Welcome = () => {
   const navigate = useNavigate();
-
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate("/");
+      if (session) {
+        navigate("/");
+      }
     });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) navigate("/");
+      if (session) {
+        navigate("/");
+      }
     });
     return () => subscription.unsubscribe();
   }, [navigate]);
-
   const scrollToFeatures = () => {
-    // We scroll to the start of the horizontal section
-    document.getElementById("features-start")?.scrollIntoView({ behavior: "smooth" });
+    document.getElementById("features")?.scrollIntoView({
+      behavior: "smooth",
+    });
   };
-
-  // ADDED: The features data that was missing
-  const features = [
-    {
-      icon: Sparkles,
-      title: "AI-Powered Planning",
-      description:
-        "Get personalized itineraries crafted by advanced AI based on your preferences, budget, and travel style.",
-      emoji: "🤖",
-    },
-    {
-      icon: Ticket,
-      title: "Unified Booking",
-      description: "Book flights, trains, buses, hotels, and cabs all in one place with the best prices guaranteed.",
-      emoji: "🎫",
-    },
-    {
-      icon: Shield,
-      title: "Best Price Guarantee",
-      description: "Our algorithms scan hundreds of options to find you unbeatable deals and exclusive discounts.",
-      emoji: "💰",
-    },
-    {
-      icon: Users,
-      title: "Social Travel Network",
-      description: "Connect with fellow travelers, share experiences, and find travel buddies for your next adventure.",
-      emoji: "👥",
-    },
-    {
-      icon: Globe,
-      title: "All-in-One Dashboard",
-      description: "Manage bookings, itineraries, and documents in one intuitive dashboard with offline access.",
-      emoji: "📱",
-    },
-    {
-      icon: Zap,
-      title: "Lightning Fast Search",
-      description: "Get instant results from thousands of routes and operators in seconds.",
-      emoji: "⚡",
-    },
-  ];
-
   return (
-    // overflow-x-hidden is CORRECT. Do not change to overflow-hidden.
     <div className="min-h-screen bg-background relative overflow-x-hidden">
       {/* Floating Particles Background */}
       <FloatingParticles />
@@ -112,7 +75,9 @@ const Welcome = () => {
         <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
         <div
           className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-accent/10 rounded-full blur-[120px] animate-pulse"
-          style={{ animationDelay: "1s" }}
+          style={{
+            animationDelay: "1s",
+          }}
         />
       </div>
 
@@ -193,7 +158,12 @@ const Welcome = () => {
                     <Suspense
                       fallback={
                         <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 animate-pulse flex items-center justify-center">
-                          <Globe className="h-20 w-20 text-white/50 animate-spin" style={{ animationDuration: "3s" }} />
+                          <Globe
+                            className="h-20 w-20 text-white/50 animate-spin"
+                            style={{
+                              animationDuration: "3s",
+                            }}
+                          />
                         </div>
                       }
                     >
@@ -218,13 +188,10 @@ const Welcome = () => {
           </div>
         </section>
 
-        {/* --- HORIZONTAL SCROLL SECTION --- */}
-        {/* Important: ID added for the scroll button to work */}
-        <div id="features-start">
-          <HorizontalScrollFeatures features={features} />
-        </div>
+        {/* Horizontal Scroll Features */}
+        <HorizontalScrollFeatures />
 
-        {/* Featured Trips */}
+        {/* Featured Trips - No gap after features */}
         <FeaturedTrips />
 
         {/* Feedback Section */}
@@ -247,7 +214,9 @@ const Welcome = () => {
             <CardContent className="text-center space-y-6 relative z-10">
               <p className="text-xl font-medium text-foreground">Would you use Travexa if it were fully functional?</p>
               <p className="text-muted-foreground max-w-lg mx-auto">
-                Your feedback helps us understand what travelers need most.
+                Your feedback helps us understand what travelers need most. We're working hard to bring you features
+                like social connections with fellow travelers, travel companion matching, and seamless booking
+                experiences.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
                 <Button size="lg" className="px-8 shadow-xl shadow-primary/20 hover:shadow-primary/40" asChild>
@@ -281,12 +250,26 @@ const Welcome = () => {
         </div>
       </footer>
 
-      {/* CSS for animations */}
+      {/* Float Animation Keyframes */}
       <style>{`
-        @keyframes gradient {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0px) rotate(0deg);
+          }
+          50% {
+            transform: translateY(-20px) rotate(5deg);
+          }
         }
+        
+        @keyframes gradient {
+          0%, 100% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+        }
+        
         .animate-gradient {
           background-size: 200% 200%;
           animation: gradient 4s ease infinite;
@@ -295,5 +278,4 @@ const Welcome = () => {
     </div>
   );
 };
-
 export default Welcome;
