@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight, Bookmark, Clock, CheckCircle, XCircle } from "lucide-react";
+import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight, Bookmark, Clock, CheckCircle, XCircle, Wallet } from "lucide-react";
 import DashboardNav from "@/components/DashboardNav";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -59,6 +59,9 @@ const Profile = () => {
   const [connectionStatus, setConnectionStatus] = useState<string>("none");
   const [canMessage, setCanMessage] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  
+  // Wallet state
+  const [walletBalance] = useState(2500);
   
   // Saved posts state
   const [savedPosts, setSavedPosts] = useState<any[]>([]);
@@ -649,20 +652,20 @@ const Profile = () => {
                   </CardContent>
                 </Card>
               </Link>
-              <div className="group cursor-pointer" onClick={() => setActiveTab("saved")}>
-                <Card className="overflow-hidden hover:shadow-lg transition-all border-0 bg-gradient-to-br from-rose-500/10 via-pink-500/5 to-red-500/10 hover:scale-[1.02]">
+              <Link to="/profile?tab=wallet" className="group">
+                <Card className="overflow-hidden hover:shadow-lg transition-all border-0 bg-gradient-to-br from-emerald-500/10 via-green-500/5 to-teal-500/10 hover:scale-[1.02]">
                   <CardContent className="p-4 md:p-6 flex items-center gap-3 md:gap-4">
-                    <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-rose-500 to-pink-500 text-white shadow-lg">
-                      <Bookmark className="h-5 w-5 md:h-6 md:w-6" />
+                    <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg">
+                      <Wallet className="h-5 w-5 md:h-6 md:w-6" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm md:text-base group-hover:text-primary transition-colors truncate">Saved</h3>
-                      <p className="text-xs text-muted-foreground hidden md:block">{savedPosts.length} posts</p>
+                      <h3 className="font-semibold text-sm md:text-base group-hover:text-primary transition-colors truncate">Wallet</h3>
+                      <p className="text-xs text-muted-foreground hidden md:block">₹{walletBalance.toLocaleString()}</p>
                     </div>
                     <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground group-hover:translate-x-1 transition-transform hidden sm:block" />
                   </CardContent>
                 </Card>
-              </div>
+              </Link>
             </div>
           </div>
         )}
