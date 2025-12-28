@@ -6,15 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import FeaturedTrips from "@/components/FeaturedTrips";
 import FloatingParticles from "@/components/FloatingParticles";
-// Ensure this component exists in src/components/HorizontalScrollFeatures.tsx
+// Import the new component
 import HorizontalScrollFeatures from "@/components/HorizontalScrollFeatures";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { Plane, Sparkles, Globe, ChevronDown, Ticket, Shield, Users, Zap } from "lucide-react";
 
-// Lazy load the heavy 3D globe
 const RealisticGlobe = lazy(() => import("@/components/RealisticGlobe"));
 
-// Helper component for fade-in animations on scroll
 const AnimatedSection = ({
   children,
   className = "",
@@ -43,7 +41,6 @@ const AnimatedSection = ({
 const Welcome = () => {
   const navigate = useNavigate();
 
-  // 1. Authentication Check
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) navigate("/");
@@ -56,16 +53,13 @@ const Welcome = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // 2. Smooth Scroll Handler
   const scrollToFeatures = () => {
-    // Scrolls to the start of the horizontal section
     const element = document.getElementById("features-start");
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
     }
   };
 
-  // 3. Features Data (Passed to the horizontal scroll component)
   const features = [
     {
       icon: Sparkles,
@@ -107,10 +101,9 @@ const Welcome = () => {
   ];
 
   return (
-    // CRITICAL: overflow-x-hidden allows horizontal scroll component to work without breaking the page layout
     <div className="min-h-screen bg-background relative overflow-x-hidden">
-      {/* --- Background Effects --- */}
       <FloatingParticles />
+
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
         <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
@@ -120,7 +113,6 @@ const Welcome = () => {
         />
       </div>
 
-      {/* --- Header --- */}
       <header className="relative z-50 bg-background/60 backdrop-blur-xl border-b border-border/50 sticky top-0">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center max-w-6xl">
           <Link to="/welcome" className="flex items-center gap-2 group">
@@ -143,11 +135,9 @@ const Welcome = () => {
       </header>
 
       <main className="relative z-10">
-        {/* --- Hero Section --- */}
         <section className="min-h-[90vh] flex items-center justify-center relative">
           <div className="container mx-auto px-6 py-16 max-w-6xl">
             <div className="flex flex-col lg:flex-row items-center gap-12">
-              {/* Text Content */}
               <AnimatedSection className="flex-1 text-center lg:text-left">
                 <Badge
                   variant="secondary"
@@ -186,7 +176,6 @@ const Welcome = () => {
                 </div>
               </AnimatedSection>
 
-              {/* 3D Globe */}
               <AnimatedSection delay={300} className="flex-1 flex justify-center">
                 <div className="relative w-[320px] h-[320px] md:w-[420px] md:h-[420px]">
                   <div className="absolute inset-0 rounded-full bg-gradient-to-br from-cyan-500/40 via-blue-500/30 to-purple-500/40 blur-3xl animate-pulse" />
@@ -210,23 +199,25 @@ const Welcome = () => {
               </AnimatedSection>
             </div>
           </div>
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+            <ChevronDown className="h-8 w-8 text-muted-foreground" />
+          </div>
         </section>
 
-        {/* --- Horizontal Scroll Features Section --- */}
-        {/* We use an ID here to allow the "Explore Features" button to scroll to this exact spot */}
+        {/* --- HORIZONTAL SCROLL FEATURES SECTION --- */}
+        {/* We use id="features-start" for the scroll button */}
         <div id="features-start">
           <HorizontalScrollFeatures features={features} />
         </div>
 
-        {/* --- Featured Trips Section --- */}
+        {/* Featured Trips */}
         <FeaturedTrips />
 
-        {/* --- Feedback Section --- */}
+        {/* Feedback Section */}
         <AnimatedSection className="container mx-auto px-6 py-20 max-w-4xl">
           <Card className="relative overflow-hidden border-2 border-accent/20 bg-gradient-to-br from-accent/5 via-background to-primary/5 backdrop-blur-xl shadow-2xl">
             <div className="absolute top-0 right-0 w-64 h-64 bg-accent/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
-
             <CardHeader className="text-center relative z-10">
               <Badge className="w-fit mx-auto mb-4 bg-accent/20 text-accent border-accent/30">
                 <Sparkles className="h-3 w-3 mr-1" />
@@ -256,7 +247,6 @@ const Welcome = () => {
         </AnimatedSection>
       </main>
 
-      {/* --- Footer --- */}
       <footer className="relative z-10 border-t border-border/50 bg-background/60 backdrop-blur-xl">
         <div className="container mx-auto px-6 py-8 max-w-6xl">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
@@ -276,12 +266,7 @@ const Welcome = () => {
         </div>
       </footer>
 
-      {/* --- Global Styles for Animations --- */}
       <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-20px) rotate(5deg); }
-        }
         @keyframes gradient {
           0%, 100% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
