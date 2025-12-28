@@ -6,79 +6,87 @@ import { Badge } from "@/components/ui/badge";
 
 interface InteractiveRouteMapProps {
   steps: ItineraryStep[];
-  currentLocation?: string; // Optional: Home/Airport origin
-  destination?: string; // Optional: Main city name
+  currentLocation?: string;
+  destination?: string;
 }
 
 const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({ steps, currentLocation, destination }) => {
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
 
-  // 1. Logic to extract and clean location names
+  // 1. Extract and Clean Locations
   const uniqueLocations = steps.reduce((acc, step) => {
     if (!step.location) return acc;
     const lastLoc = acc.length > 0 ? acc[acc.length - 1] : null;
-    // Filter duplicates
     if (step.location !== lastLoc) {
       acc.push(step.location);
     }
     return acc;
   }, [] as string[]);
 
-  // 2. Filter Logic: Remove Home/Origin to focus on the trip destination
+  // 2. Filter out Home/Airport to focus on the Trip Area
   let displayLocations: string[] = [];
   if (uniqueLocations.length > 1) {
     const startLocation = uniqueLocations[0];
     let trimmed = uniqueLocations.slice(1);
-    // If round trip (starts and ends at home), remove the return leg too
     if (trimmed.length > 0 && trimmed[trimmed.length - 1] === startLocation) {
       trimmed.pop();
     }
-    // If we have valid stops left, use them. Otherwise fallback to everything.
     displayLocations = trimmed.length > 0 ? trimmed : uniqueLocations;
   } else {
     displayLocations = uniqueLocations;
   }
 
-  // Fallback: If no locations found in steps, use the generic destination name
+  // Fallback
   if (displayLocations.length === 0 && destination) {
     displayLocations = [destination];
   } else if (displayLocations.length === 0) {
     return null;
   }
 
-  // 3. Build the URL (The "No API" Magic)
+  // 3. THE FIX: Use 'saddr' and 'daddr' to force the Blue Route Line
   const buildMapUrl = () => {
     const baseUrl = "https://maps.google.com/maps";
 
-    // MODE A: Single Location Selected (Interactive Zoom)
+    // MODE A: Single Location (Zoomed In)
     if (selectedLocation) {
-      return `${baseUrl}?q=${encodeURIComponent(selectedLocation)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+      return `${baseUrl}?q=${encodeURIComponent(selectedLocation)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
     }
 
-    // MODE B: Full Route View
-    // If only one location exists in total
+    // MODE B: Full Route with Blue Line
     if (displayLocations.length === 1) {
-      return `${baseUrl}?q=${encodeURIComponent(displayLocations[0])}&t=&z=12&ie=UTF8&iwloc=&output=embed`;
+      return `${baseUrl}?q=${encodeURIComponent(displayLocations[0])}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
     }
 
-    // Route: "from:A to:B to:C"
-    // Limit to 10 stops to prevent URL overflow
+    // We limit to 10 stops to prevent URL errors
     const safeLocations = displayLocations.slice(0, 10);
-    const start = safeLocations[0];
-    const others = safeLocations.slice(1);
 
-    let queryString = `from:${start}`;
-    others.forEach((loc) => {
-      queryString += `+to:${loc}`;
+    const start = safeLocations[0];
+    const end = safeLocations[safeLocations.length - 1];
+    const waypoints = safeLocations.slice(1, -1);
+
+    // saddr = Starting Address
+    // daddr = Destination Address (can include multiple stops separated by +to:)
+
+    let url = `${baseUrl}?saddr=${encodeURIComponent(start)}&daddr=`;
+
+    // Add waypoints (Intermediate stops)
+    waypoints.forEach((loc) => {
+      url += `${encodeURIComponent(loc)}+to:`;
     });
 
-    return `${baseUrl}?q=${encodeURIComponent(queryString)}&t=&z=10&ie=UTF8&iwloc=&output=embed`;
+    // Add final destination
+    url += `${encodeURIComponent(end)}`;
+
+    // &output=embed -> Makes it an iframe
+    // &t=m -> Standard Map Type
+    // &z= -> Zoom level (removed so it auto-fits)
+    return `${url}&output=embed`;
   };
 
   return (
     <div className="w-full rounded-3xl overflow-hidden shadow-lg border border-border mb-10 bg-card transition-all duration-300 hover:shadow-xl">
-      {/* --- Header --- */}
+      {/* Header */}
       <div className="p-4 border-b bg-muted/30 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {selectedLocation ? (
@@ -86,13 +94,12 @@ const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({ steps, curren
           ) : (
             <Route className="h-5 w-5 text-primary" />
           )}
-          <h3 className="font-semibold">{selectedLocation ? "Location Detail" : "Trip Route Preview"}</h3>
+          <h3 className="font-semibold">{selectedLocation ? "Location Detail" : "Route Overview"}</h3>
           <Badge variant="secondary" className="text-xs ml-2">
             {displayLocations.length} Stops
           </Badge>
         </div>
 
-        {/* Reset Button (Only shows when a filter is active) */}
         {selectedLocation && (
           <Button
             variant="ghost"
@@ -105,7 +112,7 @@ const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({ steps, curren
         )}
       </div>
 
-      {/* --- Interactive Pills --- */}
+      {/* Location Pills */}
       <div className="p-3 border-b bg-background overflow-x-auto scrollbar-hide">
         <div className="flex gap-2 min-w-max px-1">
           {displayLocations.map((loc, idx) => {
@@ -130,19 +137,19 @@ const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({ steps, curren
         </div>
       </div>
 
-      {/* --- Map Frame --- */}
-      <div className="relative h-[400px] md:h-[450px] bg-muted group">
+      {/* Map Frame */}
+      <div className="relative h-[400px] md:h-[500px] bg-muted group">
         {!iframeLoaded && (
           <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">Loading Map...</p>
+              <p className="text-sm text-muted-foreground">Calculating Route...</p>
             </div>
           </div>
         )}
 
         <iframe
-          key={selectedLocation || "route"} // Forces re-render when switching modes
+          key={selectedLocation || "route"}
           width="100%"
           height="100%"
           style={{ border: 0, opacity: iframeLoaded ? 1 : 0 }}
@@ -154,31 +161,27 @@ const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({ steps, curren
           title="Trip Route Map"
           className="transition-opacity duration-500 w-full h-full grayscale-[10%] group-hover:grayscale-0"
         />
-
-        {/* Overlay Badge */}
-        <div className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm text-xs font-bold px-3 py-1.5 rounded-full shadow-sm text-muted-foreground pointer-events-none flex items-center gap-1 border border-border">
-          <Navigation className="h-3 w-3" />
-          {selectedLocation ? "Viewing Location" : "Viewing Route"}
-        </div>
       </div>
 
-      {/* --- Footer Summary --- */}
+      {/* Footer */}
       {!selectedLocation && displayLocations.length > 1 && (
         <div className="p-3 border-t bg-muted/20">
           <div className="flex items-center gap-3 text-xs md:text-sm">
-            <div className="flex items-center gap-1.5 text-primary font-medium">
-              <div className="w-2 h-2 rounded-full bg-green-500 shadow-sm" />
-              <span className="truncate max-w-[120px]">{displayLocations[0]}</span>
+            <div className="flex items-center gap-1.5 text-green-600 font-medium">
+              <div className="w-2 h-2 rounded-full bg-green-600 shadow-sm" />
+              <span className="truncate max-w-[120px]">Start: {displayLocations[0]}</span>
             </div>
 
             <div className="flex-1 h-px bg-border relative">
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-muted px-2 text-[10px] text-muted-foreground border border-border rounded-full">
-                {displayLocations.length - 2 > 0 ? `+${displayLocations.length - 2} stops` : "via"}
+                via {displayLocations.length - 2} stops
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 text-primary font-medium">
-              <span className="truncate max-w-[120px] text-right">{displayLocations[displayLocations.length - 1]}</span>
+            <div className="flex items-center gap-1.5 text-red-500 font-medium">
+              <span className="truncate max-w-[120px] text-right">
+                End: {displayLocations[displayLocations.length - 1]}
+              </span>
               <div className="w-2 h-2 rounded-full bg-red-500 shadow-sm" />
             </div>
           </div>
