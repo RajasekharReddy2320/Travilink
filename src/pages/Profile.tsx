@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight, Bookmark, Clock, CheckCircle, XCircle, Wallet, History } from "lucide-react";
+import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight, Bookmark, Clock, CheckCircle, XCircle, Wallet, History, Shield } from "lucide-react";
+import { SecureVault } from "@/components/SecureVault";
 import DashboardNav from "@/components/DashboardNav";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -585,7 +586,7 @@ const Profile = () => {
         {/* Content Tabs */}
         <div className="px-4 md:px-8 mt-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full grid grid-cols-6 bg-muted/50 rounded-xl p-1">
+            <TabsList className={`w-full grid ${isOwnProfile ? 'grid-cols-7' : 'grid-cols-4'} bg-muted/50 rounded-xl p-1`}>
               <TabsTrigger value="posts" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
                 <Grid3X3 className="h-4 w-4 md:mr-2" />
                 <span className="hidden md:inline">Posts</span>
@@ -609,6 +610,10 @@ const Profile = () => {
               {isOwnProfile && <TabsTrigger value="saved" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
                   <Bookmark className="h-4 w-4 md:mr-2" />
                   <span className="hidden md:inline">Saved</span>
+                </TabsTrigger>}
+              {isOwnProfile && <TabsTrigger value="vault" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  <Shield className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Vault</span>
                 </TabsTrigger>}
             </TabsList>
 
@@ -829,6 +834,11 @@ const Profile = () => {
                       </div>)}
                   </div>}
               </TabsContent>}
+
+            {/* Secure Vault Tab */}
+            {isOwnProfile && <TabsContent value="vault" className="mt-6">
+              <SecureVault userId={currentUserId} />
+            </TabsContent>}
           </Tabs>
         </div>
 
