@@ -650,27 +650,24 @@ const Explore = () => {
       id: "connections" as const,
       label: "Connections",
       icon: Users,
-      badge: pendingReceived.length,
+      badge: connections.length,
     },
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* 1. Header (Fixed to Top) */}
-      <div className="fixed top-0 left-0 right-0 z-50 h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <DashboardNav />
-      </div>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* 1. Header (Normal flow, so it scrolls away) */}
+      <DashboardNav />
 
-      {/* 2. Main Layout - Padded top to avoid header overlap */}
-      <div className="pt-16">
-        {/* SIDEBAR: Fixed to Left, starts below Header */}
+      {/* 2. Content Container (Flex container for sidebar + main) */}
+      <div className="flex flex-1 items-start">
+        {/* SIDEBAR: Sticky positioning makes it stick to the top when header scrolls out */}
         <aside
-          className={`fixed left-0 top-16 bottom-0 overflow-y-auto border-r bg-background/95 backdrop-blur-sm z-40 transition-all duration-200 ease-in-out
+          className={`sticky top-0 h-screen overflow-y-auto border-r bg-background/95 backdrop-blur-sm z-40 transition-all duration-200 ease-in-out
             ${isSidebarOpen ? "w-60" : "w-[72px]"}
           `}
         >
-          {/* Sidebar Toggle */}
-          <div className={`flex items-center h-12 px-3 mb-2 mt-2 ${isSidebarOpen ? "justify-end" : "justify-center"}`}>
+          <div className={`flex items-center h-16 px-3 mb-2 ${isSidebarOpen ? "justify-end" : "justify-center"}`}>
             <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
               {isSidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
@@ -723,15 +720,8 @@ const Explore = () => {
           </div>
         </aside>
 
-        {/* MAIN CONTENT AREA: 
-            Dynamic left margin based on sidebar state.
-            min-h-screen ensures background color fills view.
-        */}
-        <main
-          className={`flex-1 min-w-0 transition-all duration-200 ease-in-out px-4 py-6
-            ${isSidebarOpen ? "ml-60" : "ml-[72px]"}
-          `}
-        >
+        {/* MAIN CONTENT AREA: Expands to fill remaining width */}
+        <main className="flex-1 min-w-0 px-4 py-6">
           <div className="mx-auto max-w-4xl">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-3xl font-bold">Tramigos</h1>
