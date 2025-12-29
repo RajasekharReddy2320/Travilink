@@ -820,10 +820,10 @@ const Explore = () => {
                               <AvatarFallback>{getInitials(convo.user.full_name)}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between">
-                                <p className="font-medium truncate">{convo.user.full_name || "User"}</p>
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="font-medium break-words line-clamp-2">{convo.user.full_name || "User"}</p>
                                 {convo.unreadCount > 0 && (
-                                  <span className="bg-accent text-accent-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                  <span className="bg-accent text-accent-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center shrink-0">
                                     {convo.unreadCount}
                                   </span>
                                 )}
