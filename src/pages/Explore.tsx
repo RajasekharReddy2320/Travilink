@@ -249,9 +249,8 @@ const Explore = () => {
     setIsLoading(false);
   };
 
-  // --- RESTORED LOGIC START ---
+  // --- DATA LOADING LOGIC (RESTORED) ---
 
-  // Travel Groups functions
   const loadTravelGroups = async () => {
     const { data, error } = await supabase
       .from("travel_groups")
@@ -397,7 +396,7 @@ const Explore = () => {
     }
   };
 
-  // --- POSTS FUNCTIONS (RESTORED) ---
+  // --- POSTS FUNCTIONS ---
   const loadPosts = async () => {
     const { data, error } = await supabase
       .from("posts")
@@ -450,7 +449,6 @@ const Explore = () => {
       }));
       setConnections(connectionsWithProfiles as Connection[]);
     }
-    // Pending Received
     const { data: received } = await supabase
       .from("user_connections")
       .select("*")
@@ -463,7 +461,6 @@ const Explore = () => {
       const requestsWithProfiles = received.map((req) => ({ ...req, requester: profileMap.get(req.requester_id) }));
       setPendingReceived(requestsWithProfiles as Connection[]);
     }
-    // Pending Sent
     const { data: sent } = await supabase
       .from("user_connections")
       .select("*")
@@ -680,10 +677,14 @@ const Explore = () => {
     <div className="min-h-screen bg-background">
       <DashboardNav />
 
-      <div className="flex pt-20">
-        {/* SIDEBAR */}
+      {/* LAYOUT FIX:
+        1. Remove 'flex pt-20' wrapper to handle scrolling independently.
+        2. 'pt-20' is moved to the sidebar and main content directly.
+      */}
+      <div className="flex">
+        {/* SIDEBAR: Fixed top-0, but padded to respect header */}
         <aside
-          className={`fixed left-0 top-16 h-[calc(100vh-4rem)] bg-background/95 backdrop-blur-sm border-r z-40 transition-all duration-200 ease-in-out
+          className={`fixed left-0 top-0 h-screen bg-background/95 backdrop-blur-sm border-r z-40 pt-20 transition-all duration-200 ease-in-out
             ${isSidebarOpen ? "w-60" : "w-[72px]"}
           `}
         >
@@ -694,7 +695,7 @@ const Explore = () => {
             </Button>
           </div>
 
-          <div className="px-2 space-y-1">
+          <div className="px-2 space-y-1 overflow-y-auto h-[calc(100vh-8rem)]">
             {tabs.map((tabItem) => {
               const Icon = tabItem.icon;
               return (
@@ -704,9 +705,7 @@ const Explore = () => {
                   className={`
                     flex items-center transition-all duration-200 rounded-lg group
                     ${
-                      isSidebarOpen
-                        ? "w-full px-3 py-2 gap-4 flex-row justify-start" // Open: Row
-                        : "w-full py-4 justify-center" // Closed: Just Icon centered
+                      isSidebarOpen ? "w-full px-3 py-2 gap-4 flex-row justify-start" : "w-full py-3 justify-center" // No text when closed
                     }
                     ${
                       activeTab === tabItem.id
@@ -724,7 +723,7 @@ const Explore = () => {
                   `}
                   />
 
-                  {/* Text - Hidden when closed */}
+                  {/* Text - Only visible if sidebar is open */}
                   {isSidebarOpen && <span className="truncate font-medium text-sm">{tabItem.label}</span>}
 
                   {/* Badge */}
@@ -749,15 +748,15 @@ const Explore = () => {
         </aside>
 
         {/* MAIN CONTENT AREA */}
+        {/* Adds padding top to clear header, and margin left to clear sidebar */}
         <div
-          className={`flex-1 min-w-0 transition-all duration-200 ease-in-out px-4 py-6
+          className={`flex-1 min-w-0 transition-all duration-200 ease-in-out px-4 py-6 pt-24
           ${isSidebarOpen ? "ml-60" : "ml-[72px]"}
         `}
         >
           <div className="mx-auto max-w-4xl">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-3xl font-bold">Tramigos</h1>
-              {/* This dialog calls handlePostUpdate which now works because loadPosts is restored */}
               <CreatePostDialog onPostCreated={handlePostUpdate} />
             </div>
 
@@ -1181,7 +1180,7 @@ const Explore = () => {
                                         full_name: result.full_name,
                                         avatar_url: result.avatar_url,
                                       });
-                                      setActiveTab("messages");
+                                      handleTabChange("messages");
                                     }}
                                   >
                                     <MessageSquare className="h-4 w-4 mr-1" />
@@ -1194,6 +1193,7 @@ const Explore = () => {
                                 </>
                               ) : result.connection_status === "pending_sent" ? (
                                 <Button variant="outline" size="sm" className="flex-1" disabled>
+                                  <Clock className="h-4 w-4 mr-1" />
                                   Pending
                                 </Button>
                               ) : (
