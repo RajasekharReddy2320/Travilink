@@ -142,13 +142,10 @@ const Explore = () => {
   const { tab } = useParams<{ tab?: string }>();
   const { toast } = useToast();
 
-  // Sidebar & Auth
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("feed");
-
-  // Theme
   const [messageTheme, setMessageTheme] = useState("default");
   const [showThemePicker, setShowThemePicker] = useState(false);
 
@@ -171,7 +168,7 @@ const Explore = () => {
   const [messageText, setMessageText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [allUsers, setAllUsers] = useState<Profile[]>([]);
-  const scrollAreaRef = useRef<HTMLDivElement>(null); // For auto-scrolling chat
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Travel Buddies State
   const [travelGroups, setTravelGroups] = useState<TravelGroup[]>([]);
@@ -518,7 +515,6 @@ const Explore = () => {
   // Auto-scroll to bottom of chat
   useEffect(() => {
     if (scrollAreaRef.current) {
-      // Need to target the viewport inside ScrollArea if possible, or just the div wrapper
       const scrollContainer = scrollAreaRef.current.querySelector("[data-radix-scroll-area-viewport]");
       if (scrollContainer) {
         scrollContainer.scrollTop = scrollContainer.scrollHeight;
@@ -533,24 +529,31 @@ const Explore = () => {
       toast({ title: "Invalid Message", description: validation.error.issues[0].message, variant: "destructive" });
       return;
     }
-    const { error } = await supabase
+
+    // Optimistic Update can be done here if needed, but for safety we await DB
+    const { data, error } = await supabase
       .from("messages")
-      .insert({ sender_id: currentUserId, recipient_id: selectedUser.id, content: validation.data.content });
+      .insert({ sender_id: currentUserId, recipient_id: selectedUser.id, content: validation.data.content })
+      .select()
+      .single();
+
     if (error) {
       toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
       return;
     }
+
+    // Update local state immediately so user sees it without refresh
+    setMessages((prev) => [...prev, data as Message]);
     setMessageText("");
   };
 
-  // --- PERMANENT DELETION LOGIC ---
   const unsendMessage = async (messageId: string) => {
     const { error } = await supabase.from("messages").delete().eq("id", messageId);
     if (error) {
       toast({ title: "Error", description: "Failed to delete message", variant: "destructive" });
       return;
     }
-    // Optimistic update
+    // Update local state immediately
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
     toast({ title: "Message Deleted" });
   };
@@ -585,15 +588,20 @@ const Explore = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => loadPosts())
       .subscribe();
 
-    // 2. Messages Subscription (Handles INSERT, UPDATE, DELETE)
-    // We listen to * to ensure we catch deletions and read-status updates
+    // 2. Messages Subscription (Handles INSERT, UPDATE, DELETE for everyone involved)
+    // NOTE: We remove the filter string to catch events where I am the sender (deleted by me)
     const messagesChannel = supabase
       .channel("messages-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, (payload) => {
-        // Handle New Message
+        const msg = (payload.new || payload.old) as any;
+
+        // Only care about messages related to current user
+        if (msg.sender_id !== currentUserId && msg.recipient_id !== currentUserId) return;
+
+        // Handle New Message (Only incoming needs adding, outgoing added by function)
         if (payload.eventType === "INSERT") {
           const newMsg = payload.new as Message;
-          // Add to current chat if open
+          // Only add if it's not already in state (dedup)
           if (
             selectedUser &&
             ((newMsg.sender_id === selectedUser.id && newMsg.recipient_id === currentUserId) ||
@@ -603,7 +611,7 @@ const Explore = () => {
               if (prev.some((m) => m.id === newMsg.id)) return prev;
               return [...prev, newMsg];
             });
-            // If receiving, mark read immediately if window open
+
             if (newMsg.recipient_id === currentUserId) {
               supabase.from("messages").update({ read: true }).eq("id", newMsg.id);
             }
@@ -808,7 +816,6 @@ const Explore = () => {
                     })}
                   </div>
                 )}
-                {/* Pending Requests logic remains same but condensed here for brevity... */}
                 {pendingReceived.length > 0 && (
                   <div className="mt-8">
                     <h3 className="font-semibold mb-4">Pending Requests</h3>
@@ -879,7 +886,7 @@ const Explore = () => {
                             </Avatar>
                             <div className="flex-1 min-w-0 overflow-hidden">
                               <div className="flex justify-between items-baseline">
-                                <p className="font-medium truncate text-sm">{user.full_name || "User"}</p>
+                                <p className="font-medium text-sm break-words">{user.full_name || "User"}</p>
                                 {convo && convo.lastMessage && (
                                   <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-1">
                                     {format(new Date(convo.lastMessage.created_at), "MMM d")}
