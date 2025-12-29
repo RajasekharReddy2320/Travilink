@@ -89,7 +89,6 @@ const HorizontalScrollFeatures = () => {
   const maxProgress = useMemo(() => Math.max(0, features.length - 1), []);
 
   const lock = useCallback(() => {
-    // FIX 1: Snap to top immediately to remove the vertical gap
     if (containerRef.current) {
       containerRef.current.scrollIntoView({ behavior: "auto", block: "start" });
     }
@@ -111,7 +110,6 @@ const HorizontalScrollFeatures = () => {
       (entries) => {
         const entry = entries[0];
         if (!entry) return;
-        // Trigger slightly earlier (0.95) but allow the lock() function to snap it to 1.0
         if (entry.intersectionRatio >= 0.95) {
           lock();
         } else {
@@ -144,7 +142,6 @@ const HorizontalScrollFeatures = () => {
       if (leavingDown || leavingUp) {
         unlock();
         requestAnimationFrame(() => {
-          // Adjusted scroll push to be smoother
           window.scrollBy({ top: leavingDown ? 1 : -1, left: 0, behavior: "auto" });
         });
       }
@@ -169,115 +166,91 @@ const HorizontalScrollFeatures = () => {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [locked, progress, maxProgress]);
 
-  // FIX 2: Correct math to sync progress bar with slides
-  // We move the track by a percentage relative to the track's total width.
-  // Since the track is (features.length * 100)%, we need to divide by length.
   const translateX = -(progress * 100) / features.length;
-
   const progressPercent = (progress / maxProgress) * 100;
 
   return (
     <section id="features" ref={containerRef as any} className="relative h-screen -mb-px" aria-label="Travexa features">
-      {/* Top Progress Bar + Counter */}
+      {/* --- UNIFIED NAVIGATION DOCK --- 
+        Combines Progress Bar + Navigation Buttons + Motion Toggle
+      */}
       <div
-        className="fixed top-20 left-0 right-0 z-50 px-4 transition-opacity duration-300"
-        style={{ opacity: locked ? 1 : 0, pointerEvents: locked ? "auto" : "none" }}
+        className="fixed bottom-8 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-auto z-50 transition-all duration-500 ease-out"
+        style={{
+          opacity: locked ? 1 : 0,
+          pointerEvents: locked ? "auto" : "none",
+          transform: locked ? "translate(-50%, 0)" : "translate(-50%, 20px)",
+        }}
       >
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-4 bg-card/80 backdrop-blur-xl rounded-full px-4 py-2 shadow-lg border">
-            {/* Slide Counter */}
-            <div className="flex items-center gap-2 text-sm font-medium min-w-[60px]">
-              <span className="text-foreground">{activeIndex + 1}</span>
-              <span className="text-muted-foreground">/</span>
-              <span className="text-muted-foreground">{features.length}</span>
+        <div className="bg-card/90 backdrop-blur-2xl rounded-2xl shadow-2xl border border-border/50 overflow-hidden flex flex-col w-full md:min-w-[600px]">
+          {/* 1. Integrated Progress Line (Top Edge of Dock) */}
+          <div className="h-1 w-full bg-muted/50">
+            <div
+              className={`h-full bg-gradient-to-r ${features[activeIndex]?.gradient || "from-primary to-accent"}`}
+              style={{
+                width: `${progressPercent}%`,
+                transition: prefersReducedMotion ? "none" : "width 150ms ease-out",
+              }}
+            />
+          </div>
+
+          {/* 2. Controls Area */}
+          <div className="flex items-center p-2 gap-2 overflow-x-auto scrollbar-hide">
+            {/* Counter */}
+            <div className="hidden md:flex items-center px-3 text-xs font-mono font-medium text-muted-foreground border-r mr-1">
+              <span className="text-foreground text-sm">{activeIndex + 1}</span>
+              <span className="mx-1">/</span>
+              <span>{features.length}</span>
             </div>
 
-            {/* Progress Bar */}
-            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-              <div
-                className={`h-full bg-gradient-to-r ${features[activeIndex]?.gradient || "from-primary to-accent"} rounded-full`}
-                style={{
-                  width: `${progressPercent}%`,
-                  transition: prefersReducedMotion ? "none" : "width 150ms ease-out",
-                }}
-              />
+            {/* Horizontal Buttons List */}
+            <div className="flex flex-1 gap-2 items-center justify-center md:justify-start">
+              {features.map((feature, idx) => {
+                const isActive = activeIndex === idx;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setProgress(idx);
+                      setActiveIndex(idx);
+                    }}
+                    className={`
+                      relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300
+                      ${isActive ? "bg-muted shadow-sm" : "hover:bg-muted/50 text-muted-foreground"}
+                    `}
+                  >
+                    <div
+                      className={`
+                       flex items-center justify-center w-6 h-6 rounded-md text-sm transition-transform duration-300
+                       ${isActive ? "scale-110" : "scale-100 grayscale"}
+                    `}
+                    >
+                      {feature.emoji}
+                    </div>
+
+                    {/* Only show text for the active item to save space */}
+                    <div
+                      className={`
+                        overflow-hidden transition-all duration-300 ease-in-out
+                        ${isActive ? "w-auto opacity-100 max-w-[150px]" : "w-0 opacity-0 max-w-0"}
+                    `}
+                    >
+                      <span
+                        className={`text-xs font-semibold whitespace-nowrap bg-gradient-to-r ${feature.gradient} bg-clip-text text-transparent`}
+                      >
+                        {feature.title.split(" ")[0]}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Feature Title */}
-            <div className="hidden sm:block text-sm font-medium text-foreground min-w-[140px] text-right truncate">
-              {features[activeIndex]?.title}
-            </div>
-
-            {/* Reduce Motion Toggle */}
-            <ReduceMotionToggle compact className="ml-2" />
+            {/* Divider & Toggle */}
+            <div className="h-6 w-px bg-border mx-1 hidden md:block" />
+            <ReduceMotionToggle compact className="shrink-0" />
           </div>
         </div>
-      </div>
-
-      {/* Side Navigation (Desktop) */}
-      <div
-        className="fixed left-8 top-1/2 -translate-y-1/2 z-50 hidden lg:flex flex-col gap-4 transition-opacity duration-500"
-        style={{ opacity: locked ? 1 : 0, pointerEvents: locked ? "auto" : "none" }}
-      >
-        <div className="bg-card/80 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border">
-          {features.map((feature, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                setProgress(idx);
-                setActiveIndex(idx);
-              }}
-              className={`
-                flex items-center gap-3 w-full p-2 rounded-xl transition-all
-                ${prefersReducedMotion ? "" : "duration-300"}
-                ${activeIndex === idx ? "bg-primary/10" : "hover:bg-muted/50"}
-              `}
-            >
-              <div
-                className={`
-                  w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all
-                  ${prefersReducedMotion ? "" : "duration-300"}
-                  ${
-                    activeIndex === idx
-                      ? `bg-gradient-to-r ${feature.gradient} text-white shadow-lg scale-110`
-                      : "bg-muted text-muted-foreground"
-                  }
-                `}
-              >
-                {feature.emoji}
-              </div>
-              <span
-                className={`text-sm font-medium transition-colors ${
-                  activeIndex === idx ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                {feature.title.split(" ")[0]}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Mobile Progress Dots */}
-      <div
-        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex lg:hidden gap-2 p-2 bg-card/80 backdrop-blur-xl rounded-full shadow-xl border transition-opacity duration-500"
-        style={{ opacity: locked ? 1 : 0, pointerEvents: locked ? "auto" : "none" }}
-      >
-        {features.map((feature, idx) => (
-          <button
-            key={idx}
-            onClick={() => {
-              setProgress(idx);
-              setActiveIndex(idx);
-            }}
-            className={`
-              w-3 h-3 rounded-full transition-all
-              ${prefersReducedMotion ? "" : "duration-300"}
-              ${activeIndex === idx ? `bg-gradient-to-r ${feature.gradient} scale-125` : "bg-muted hover:bg-muted-foreground/50"}
-            `}
-            aria-label={`Go to ${feature.title}`}
-          />
-        ))}
       </div>
 
       {/* Track */}
@@ -296,6 +269,7 @@ const HorizontalScrollFeatures = () => {
               className="relative w-full h-full flex items-center justify-center overflow-hidden"
               style={{ width: `${100 / features.length}%` }}
             >
+              {/* Backgrounds */}
               <div className={`absolute inset-0 bg-gradient-to-br ${feature.bgGradient} dark:opacity-100 opacity-0`} />
               <div className={`absolute inset-0 bg-gradient-to-br ${feature.lightBg} dark:opacity-0 opacity-50`} />
 
@@ -312,6 +286,7 @@ const HorizontalScrollFeatures = () => {
                 </>
               )}
 
+              {/* Main Content */}
               <div className="container mx-auto px-6 md:px-12 lg:px-20 py-20 max-w-7xl relative z-10">
                 <div
                   className={`flex flex-col ${
@@ -332,7 +307,7 @@ const HorizontalScrollFeatures = () => {
                         />
                       )}
 
-                      <div className="relative bg-card/80 backdrop-blur-xl border rounded-3xl p-8 md:p-12 shadow-2xl">
+                      <div className="relative bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl p-8 md:p-12 shadow-2xl">
                         <div
                           className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center shadow-xl mb-6`}
                         >
