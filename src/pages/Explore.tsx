@@ -170,9 +170,7 @@ const Explore = () => {
   const { tab } = useParams<{ tab?: string }>();
   const { toast } = useToast();
 
-  // Sidebar State
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("feed");
@@ -212,7 +210,6 @@ const Explore = () => {
   const [buddySearchResults, setBuddySearchResults] = useState<BuddySearchResult[]>([]);
   const [buddySearchLoading, setBuddySearchLoading] = useState(false);
 
-  // Sync tab from URL
   useEffect(() => {
     if (tab && VALID_TABS.includes(tab as TabType)) {
       setActiveTab(tab as TabType);
@@ -249,8 +246,7 @@ const Explore = () => {
     setIsLoading(false);
   };
 
-  // --- DATA LOADING LOGIC (RESTORED) ---
-
+  // --- DATA LOADING LOGIC ---
   const loadTravelGroups = async () => {
     const { data, error } = await supabase
       .from("travel_groups")
@@ -289,12 +285,9 @@ const Explore = () => {
 
   const handleGroupUpdate = () => {
     loadTravelGroups();
-    if (currentUserId) {
-      loadUserGroupMemberships(currentUserId);
-    }
+    if (currentUserId) loadUserGroupMemberships(currentUserId);
   };
 
-  // Search Logic
   const performBuddySearch = async () => {
     if (!currentUserId) return;
     setBuddySearchLoading(true);
@@ -330,11 +323,9 @@ const Explore = () => {
   const sendBuddyConnectionRequest = async (targetUserId: string) => {
     if (!currentUserId) return;
     try {
-      const { error } = await supabase.from("user_connections").insert({
-        requester_id: currentUserId,
-        addressee_id: targetUserId,
-        status: "pending",
-      });
+      const { error } = await supabase
+        .from("user_connections")
+        .insert({ requester_id: currentUserId, addressee_id: targetUserId, status: "pending" });
       if (error) throw error;
       toast({ title: "Request Sent", description: "Connection request sent successfully" });
       performBuddySearch();
@@ -343,7 +334,6 @@ const Explore = () => {
     }
   };
 
-  // Geolocation
   const requestLocation = async () => {
     setLocationError(null);
     setNearbyLoading(true);
@@ -396,18 +386,11 @@ const Explore = () => {
     }
   };
 
-  // --- POSTS FUNCTIONS ---
   const loadPosts = async () => {
     const { data, error } = await supabase
       .from("posts")
-      .select(
-        `
-        *,
-        profiles:user_id (full_name, avatar_url)
-      `,
-      )
+      .select(`*, profiles:user_id (full_name, avatar_url)`)
       .order("created_at", { ascending: false });
-
     if (error) {
       toast({ title: "Error loading posts", description: error.message, variant: "destructive" });
       return;
@@ -431,7 +414,6 @@ const Explore = () => {
     }
   };
 
-  // Connections functions
   const loadConnections = async (userId: string) => {
     const { data: accepted } = await supabase
       .from("user_connections")
@@ -442,12 +424,13 @@ const Explore = () => {
       const userIds = [...new Set(accepted.flatMap((c) => [c.requester_id, c.addressee_id]))];
       const { data: profiles } = await supabase.from("profiles").select("id, full_name, avatar_url").in("id", userIds);
       const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
-      const connectionsWithProfiles = accepted.map((conn) => ({
-        ...conn,
-        requester: profileMap.get(conn.requester_id),
-        addressee: profileMap.get(conn.addressee_id),
-      }));
-      setConnections(connectionsWithProfiles as Connection[]);
+      setConnections(
+        accepted.map((conn) => ({
+          ...conn,
+          requester: profileMap.get(conn.requester_id),
+          addressee: profileMap.get(conn.addressee_id),
+        })) as Connection[],
+      );
     }
     const { data: received } = await supabase
       .from("user_connections")
@@ -458,8 +441,9 @@ const Explore = () => {
       const userIds = received.map((r) => r.requester_id);
       const { data: profiles } = await supabase.from("profiles").select("id, full_name, avatar_url").in("id", userIds);
       const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
-      const requestsWithProfiles = received.map((req) => ({ ...req, requester: profileMap.get(req.requester_id) }));
-      setPendingReceived(requestsWithProfiles as Connection[]);
+      setPendingReceived(
+        received.map((req) => ({ ...req, requester: profileMap.get(req.requester_id) })) as Connection[],
+      );
     }
     const { data: sent } = await supabase
       .from("user_connections")
@@ -470,8 +454,7 @@ const Explore = () => {
       const userIds = sent.map((s) => s.addressee_id);
       const { data: profiles } = await supabase.from("profiles").select("id, full_name, avatar_url").in("id", userIds);
       const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
-      const requestsWithProfiles = sent.map((req) => ({ ...req, addressee: profileMap.get(req.addressee_id) }));
-      setPendingSent(requestsWithProfiles as Connection[]);
+      setPendingSent(sent.map((req) => ({ ...req, addressee: profileMap.get(req.addressee_id) })) as Connection[]);
     }
   };
 
@@ -481,7 +464,7 @@ const Explore = () => {
       toast({ title: "Error", variant: "destructive" });
       return;
     }
-    toast({ title: "Connection Accepted", description: "You are now connected!" });
+    toast({ title: "Connection Accepted" });
     if (currentUserId) loadConnections(currentUserId);
   };
 
@@ -505,7 +488,6 @@ const Explore = () => {
     if (currentUserId) loadConnections(currentUserId);
   };
 
-  // Messages functions
   const loadAllUsers = async () => {
     const {
       data: { user },
@@ -600,7 +582,6 @@ const Explore = () => {
   const filteredUsers = allUsers.filter((user) => user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()));
   const currentTheme = MESSAGE_THEMES.find((t) => t.id === messageTheme) || MESSAGE_THEMES[0];
 
-  // Realtime Logic
   useEffect(() => {
     if (!currentUserId) return;
     const postsChannel = supabase
@@ -674,28 +655,25 @@ const Explore = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* 1. Header (Normal flow, so it scrolls away) */}
       <DashboardNav />
 
-      {/* LAYOUT FIX:
-        1. Remove 'flex pt-20' wrapper to handle scrolling independently.
-        2. 'pt-20' is moved to the sidebar and main content directly.
-      */}
-      <div className="flex">
-        {/* SIDEBAR: Fixed top-0, but padded to respect header */}
+      {/* 2. Content Container (Flex container for sidebar + main) */}
+      <div className="flex flex-1 items-start">
+        {/* SIDEBAR: Sticky positioning makes it stick to the top when header scrolls out */}
         <aside
-          className={`fixed left-0 top-0 h-screen bg-background/95 backdrop-blur-sm border-r z-40 pt-20 transition-all duration-200 ease-in-out
+          className={`sticky top-0 h-screen overflow-y-auto border-r bg-background/95 backdrop-blur-sm z-40 transition-all duration-200 ease-in-out
             ${isSidebarOpen ? "w-60" : "w-[72px]"}
           `}
         >
-          {/* Toggle Button */}
-          <div className={`flex items-center h-12 px-3 mb-2 ${isSidebarOpen ? "justify-end" : "justify-center"}`}>
+          <div className={`flex items-center h-16 px-3 mb-2 ${isSidebarOpen ? "justify-end" : "justify-center"}`}>
             <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
               {isSidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
           </div>
 
-          <div className="px-2 space-y-1 overflow-y-auto h-[calc(100vh-8rem)]">
+          <div className="px-2 space-y-1">
             {tabs.map((tabItem) => {
               const Icon = tabItem.icon;
               return (
@@ -704,9 +682,7 @@ const Explore = () => {
                   onClick={() => handleTabChange(tabItem.id)}
                   className={`
                     flex items-center transition-all duration-200 rounded-lg group
-                    ${
-                      isSidebarOpen ? "w-full px-3 py-2 gap-4 flex-row justify-start" : "w-full py-3 justify-center" // No text when closed
-                    }
+                    ${isSidebarOpen ? "w-full px-3 py-2 gap-4 flex-row justify-start" : "w-full py-4 justify-center"}
                     ${
                       activeTab === tabItem.id
                         ? "bg-primary/10 text-primary hover:bg-primary/20"
@@ -715,7 +691,6 @@ const Explore = () => {
                   `}
                   title={!isSidebarOpen ? tabItem.label : undefined}
                 >
-                  {/* Icon */}
                   <Icon
                     className={`
                     shrink-0 transition-all
@@ -723,10 +698,8 @@ const Explore = () => {
                   `}
                   />
 
-                  {/* Text - Only visible if sidebar is open */}
                   {isSidebarOpen && <span className="truncate font-medium text-sm">{tabItem.label}</span>}
 
-                  {/* Badge */}
                   {tabItem.badge && tabItem.badge > 0 && (
                     <span
                       className={`
@@ -747,13 +720,8 @@ const Explore = () => {
           </div>
         </aside>
 
-        {/* MAIN CONTENT AREA */}
-        {/* Adds padding top to clear header, and margin left to clear sidebar */}
-        <div
-          className={`flex-1 min-w-0 transition-all duration-200 ease-in-out px-4 py-6 pt-24
-          ${isSidebarOpen ? "ml-60" : "ml-[72px]"}
-        `}
-        >
+        {/* MAIN CONTENT AREA: Expands to fill remaining width */}
+        <main className="flex-1 min-w-0 px-4 py-6">
           <div className="mx-auto max-w-4xl">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-3xl font-bold">Tramigos</h1>
@@ -796,7 +764,6 @@ const Explore = () => {
                     Sent ({pendingSent.length})
                   </Button>
                 </div>
-
                 {connections.length === 0 ? (
                   <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12">
@@ -836,8 +803,7 @@ const Explore = () => {
                                   setActiveTab("messages");
                                 }}
                               >
-                                <MessageSquare className="h-4 w-4 mr-1" />
-                                Message
+                                <MessageSquare className="h-4 w-4 mr-1" /> Message
                               </Button>
                               <Button variant="ghost" size="icon" onClick={() => removeConnection(connection.id)}>
                                 <X className="h-4 w-4" />
@@ -849,8 +815,6 @@ const Explore = () => {
                     })}
                   </div>
                 )}
-
-                {/* Pending Requests */}
                 {pendingReceived.length > 0 && (
                   <div className="mt-8">
                     <h3 className="font-semibold mb-4">Pending Requests</h3>
@@ -965,7 +929,6 @@ const Explore = () => {
                     </ScrollArea>
                   </CardContent>
                 </Card>
-
                 <Card className="md:col-span-2 flex flex-col">
                   {selectedUser ? (
                     <>
@@ -1121,7 +1084,6 @@ const Explore = () => {
                       </Select>
                     </div>
                   </div>
-
                   {buddySearchResults.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">
                       <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
@@ -1183,17 +1145,14 @@ const Explore = () => {
                                       handleTabChange("messages");
                                     }}
                                   >
-                                    <MessageSquare className="h-4 w-4 mr-1" />
-                                    Message
+                                    <MessageSquare className="h-4 w-4 mr-1" /> Message
                                   </Button>
                                   <Button variant="outline" size="sm" disabled>
-                                    <UserCheck className="h-4 w-4 mr-1" />
-                                    Connected
+                                    <UserCheck className="h-4 w-4 mr-1" /> Connected
                                   </Button>
                                 </>
                               ) : result.connection_status === "pending_sent" ? (
                                 <Button variant="outline" size="sm" className="flex-1" disabled>
-                                  <Clock className="h-4 w-4 mr-1" />
                                   Pending
                                 </Button>
                               ) : (
@@ -1202,8 +1161,7 @@ const Explore = () => {
                                   className="flex-1"
                                   onClick={() => sendBuddyConnectionRequest(result.id)}
                                 >
-                                  <UserPlus className="h-4 w-4 mr-1" />
-                                  Connect
+                                  <UserPlus className="h-4 w-4 mr-1" /> Connect
                                 </Button>
                               )}
                             </div>
@@ -1221,8 +1179,7 @@ const Explore = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
-                    Travelers Nearby
+                    <MapPin className="h-5 w-5" /> Travelers Nearby
                   </CardTitle>
                   {userLocation && (
                     <p className="text-sm text-muted-foreground">Location enabled • Showing travelers in your area</p>
@@ -1238,13 +1195,12 @@ const Explore = () => {
                       <Button onClick={requestLocation} disabled={nearbyLoading}>
                         {nearbyLoading ? (
                           <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
-                            Getting location...
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" /> Getting
+                            location...
                           </>
                         ) : (
                           <>
-                            <MapPin className="h-4 w-4 mr-2" />
-                            Enable Location
+                            <MapPin className="h-4 w-4 mr-2" /> Enable Location
                           </>
                         )}
                       </Button>
@@ -1315,18 +1271,15 @@ const Explore = () => {
                                       handleTabChange("messages");
                                     }}
                                   >
-                                    <MessageSquare className="h-4 w-4 mr-1" />
-                                    Message
+                                    <MessageSquare className="h-4 w-4 mr-1" /> Message
                                   </Button>
                                   <Button variant="outline" size="sm" disabled>
-                                    <UserCheck className="h-4 w-4 mr-1" />
-                                    Connected
+                                    <UserCheck className="h-4 w-4 mr-1" /> Connected
                                   </Button>
                                 </>
                               ) : traveler.connection_status === "pending_sent" ? (
                                 <Button variant="outline" size="sm" className="flex-1" disabled>
-                                  <Clock className="h-4 w-4 mr-1" />
-                                  Pending
+                                  <Clock className="h-4 w-4 mr-1" /> Pending
                                 </Button>
                               ) : (
                                 <Button
@@ -1334,8 +1287,7 @@ const Explore = () => {
                                   className="flex-1"
                                   onClick={() => sendBuddyConnectionRequest(traveler.id)}
                                 >
-                                  <UserPlus className="h-4 w-4 mr-1" />
-                                  Connect
+                                  <UserPlus className="h-4 w-4 mr-1" /> Connect
                                 </Button>
                               )}
                             </div>
@@ -1374,7 +1326,6 @@ const Explore = () => {
                   </div>
                   <CreateTravelGroupDialog onGroupCreated={handleGroupUpdate} />
                 </div>
-
                 {travelGroups.length === 0 ? (
                   <Card>
                     <CardContent className="pt-12 pb-12">
@@ -1400,7 +1351,7 @@ const Explore = () => {
               </>
             )}
           </div>
-        </div>
+        </main>
       </div>
     </div>
   );
