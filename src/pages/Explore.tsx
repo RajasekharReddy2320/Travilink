@@ -530,45 +530,37 @@ const Explore = () => {
       return;
     }
 
-    // 1. Send to DB (await result to get real ID/timestamp)
+    // 1. Send to DB
     const { data, error } = await supabase
       .from("messages")
       .insert({ sender_id: currentUserId, recipient_id: selectedUser.id, content: validation.data.content })
       .select()
       .single();
-
     if (error) {
       toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
       return;
     }
 
-    // 2. Add to state immediately (Fixes "not visible until refresh")
+    // 2. Add to state immediately
     setMessages((prev) => {
-      // Avoid duplicate if realtime already caught it
       if (prev.some((m) => m.id === data.id)) return prev;
       return [...prev, data as Message];
     });
 
     setMessageText("");
-    loadConversations();
+    // We don't reload conversations here, we let Realtime handle it for cleaner flow, or we could.
   };
 
   // --- PERMANENT DELETION LOGIC ---
   const unsendMessage = async (messageId: string) => {
-    // 1. Optimistic Update (Remove from UI instantly)
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
-
-    // 2. Perform DB delete
     const { error } = await supabase.from("messages").delete().eq("id", messageId);
-
     if (error) {
-      console.error("Delete failed:", error); // Debugging
-      toast({ title: "Error", description: "Failed to delete message. Check RLS policies.", variant: "destructive" });
-      // Revert optimization (optional, or just reload)
-      loadMessages();
+      console.error("Delete failed:", error);
+      toast({ title: "Error", description: "Failed to delete message. Check RLS.", variant: "destructive" });
+      loadMessages(); // Revert on failure
     } else {
       toast({ title: "Message Deleted" });
-      loadConversations();
     }
   };
 
@@ -596,26 +588,22 @@ const Explore = () => {
   useEffect(() => {
     if (!currentUserId) return;
 
-    // 1. Posts Subscription
     const postsChannel = supabase
       .channel("posts-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => loadPosts())
       .subscribe();
 
-    // 2. Messages Subscription (Handles INSERT, UPDATE, DELETE for everyone involved)
-    // NOTE: We remove the filter string to catch events where I am the sender (deleted by me)
     const messagesChannel = supabase
       .channel("messages-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, (payload) => {
         const msg = (payload.new || payload.old) as any;
 
-        // Only care about messages related to current user
+        // Filter: Does this message involve me?
         if (msg.sender_id !== currentUserId && msg.recipient_id !== currentUserId) return;
 
-        // Handle New Message (Only incoming needs adding, outgoing added by function)
         if (payload.eventType === "INSERT") {
           const newMsg = payload.new as Message;
-          // Add to current chat if open
+          // Update chat if active
           if (
             selectedUser &&
             ((newMsg.sender_id === selectedUser.id && newMsg.recipient_id === currentUserId) ||
@@ -625,7 +613,6 @@ const Explore = () => {
               if (prev.some((m) => m.id === newMsg.id)) return prev;
               return [...prev, newMsg];
             });
-
             if (newMsg.recipient_id === currentUserId) {
               supabase.from("messages").update({ read: true }).eq("id", newMsg.id);
             }
@@ -633,14 +620,12 @@ const Explore = () => {
           loadConversations();
         }
 
-        // Handle Deleted Message (Permanent Deletion)
         if (payload.eventType === "DELETE") {
           const deletedId = payload.old.id;
           setMessages((prev) => prev.filter((m) => m.id !== deletedId));
           loadConversations();
         }
 
-        // Handle Updates (Read receipts)
         if (payload.eventType === "UPDATE") {
           const updatedMsg = payload.new as Message;
           setMessages((prev) => prev.map((m) => (m.id === updatedMsg.id ? updatedMsg : m)));
@@ -679,9 +664,7 @@ const Explore = () => {
 
       {/* 2. Flex Container */}
       <div className="flex">
-        {/* SIDEBAR: Sticky top-0 h-screen
-            This ensures it sticks to the top as soon as the header scrolls out.
-        */}
+        {/* SIDEBAR: Sticky top-0 h-screen */}
         <aside
           className={`sticky top-0 h-screen overflow-y-auto border-r bg-background/95 backdrop-blur-sm z-40 transition-all duration-200 ease-in-out
             ${isSidebarOpen ? "w-60" : "w-[72px]"}
@@ -709,7 +692,6 @@ const Explore = () => {
                 >
                   <div className="relative">
                     <Icon className={`shrink-0 transition-all ${isSidebarOpen ? "h-5 w-5" : "h-6 w-6"}`} />
-                    {/* Collapsed Mode Unread Dot */}
                     {!isSidebarOpen && tabItem.id === "messages" && totalUnreadMessages > 0 && (
                       <span className="absolute -top-1 -right-1 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-background" />
                     )}
@@ -718,7 +700,6 @@ const Explore = () => {
                   {isSidebarOpen && (
                     <div className="flex-1 flex justify-between items-center overflow-hidden">
                       <span className="truncate font-medium text-sm">{tabItem.label}</span>
-                      {/* Expanded Mode Badges */}
                       {tabItem.id === "connections" && connections.length > 0 && (
                         <span className="text-xs text-muted-foreground ml-1">({connections.length})</span>
                       )}
@@ -765,7 +746,7 @@ const Explore = () => {
               </div>
             )}
 
-            {/* --- Connections Tab (Restored) --- */}
+            {/* --- Connections Tab --- */}
             {activeTab === "connections" && (
               <div className="space-y-6">
                 <div className="flex gap-2 border-b pb-4">
@@ -830,7 +811,6 @@ const Explore = () => {
                     })}
                   </div>
                 )}
-                {/* Pending Requests logic remains same but condensed here for brevity... */}
                 {pendingReceived.length > 0 && (
                   <div className="mt-8">
                     <h3 className="font-semibold mb-4">Pending Requests</h3>
@@ -865,12 +845,13 @@ const Explore = () => {
               </div>
             )}
 
-            {/* --- Messages Tab (Updated with Permanent Delete) --- */}
+            {/* --- Messages Tab (Fixed & Bounded) --- */}
             {activeTab === "messages" && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-140px)] min-h-[500px]">
+              // FIXED HEIGHT CONTAINER for chat
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-10rem)]">
                 {/* Conversations List */}
-                <Card className="md:col-span-1 border-r-0 rounded-r-none">
-                  <CardHeader className="pb-2 px-4 pt-4">
+                <Card className="md:col-span-1 border-r-0 rounded-r-none flex flex-col h-full overflow-hidden">
+                  <CardHeader className="pb-2 px-4 pt-4 shrink-0">
                     <CardTitle className="text-lg flex items-center justify-between">Chats</CardTitle>
                     <div className="relative mt-2">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -882,8 +863,8 @@ const Explore = () => {
                       />
                     </div>
                   </CardHeader>
-                  <CardContent className="p-0">
-                    <ScrollArea className="h-[calc(100vh-260px)]">
+                  <CardContent className="p-0 flex-1 min-h-0 relative">
+                    <ScrollArea className="h-full w-full">
                       {(searchQuery ? filteredUsers : conversations.map((c) => c.user)).map((user) => {
                         const convo = conversations.find((c) => c.user.id === user.id);
                         return (
@@ -927,10 +908,10 @@ const Explore = () => {
                 </Card>
 
                 {/* Chat Window */}
-                <Card className="md:col-span-2 flex flex-col border-l-0 rounded-l-none h-full">
+                <Card className="md:col-span-2 flex flex-col border-l-0 rounded-l-none h-full overflow-hidden">
                   {selectedUser ? (
                     <>
-                      <div className="border-b px-4 py-3 flex items-center justify-between bg-card/50 backdrop-blur-sm">
+                      <div className="border-b px-4 py-3 flex items-center justify-between bg-card/50 backdrop-blur-sm shrink-0">
                         <div className="flex items-center gap-3">
                           <Avatar
                             className="h-9 w-9 cursor-pointer"
@@ -965,9 +946,9 @@ const Explore = () => {
                         </div>
                       </div>
 
-                      {/* Messages Area */}
-                      <div className="flex-1 overflow-hidden relative" ref={scrollAreaRef}>
-                        <ScrollArea className="h-full px-4 py-4">
+                      {/* Messages Area - Uses flex-1 and min-h-0 to force scroll inside */}
+                      <div className="flex-1 min-h-0 relative" ref={scrollAreaRef}>
+                        <ScrollArea className="h-full w-full px-4 py-4">
                           {messages.map((msg, index) => {
                             const messageDate = new Date(msg.created_at);
                             const prevMessage = index > 0 ? messages[index - 1] : null;
@@ -992,7 +973,6 @@ const Explore = () => {
                                       className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isMe ? "opacity-80" : "text-muted-foreground"}`}
                                     >
                                       <span>{format(messageDate, "h:mm a")}</span>
-                                      {/* Read Receipts */}
                                       {isMe && (
                                         <span>
                                           {msg.read ? (
@@ -1003,7 +983,6 @@ const Explore = () => {
                                         </span>
                                       )}
                                     </div>
-                                    {/* Unsend Button */}
                                     {isMe && (
                                       <div className="absolute top-0 -left-8 opacity-0 group-hover:opacity-100 transition-opacity p-1">
                                         <Button
@@ -1024,7 +1003,7 @@ const Explore = () => {
                         </ScrollArea>
                       </div>
 
-                      <div className="p-3 bg-background border-t">
+                      <div className="p-3 bg-background border-t shrink-0">
                         <div className="flex gap-2 items-end">
                           <Input
                             placeholder="Type a message..."
@@ -1105,7 +1084,6 @@ const Explore = () => {
                         {buddySearchLoading ? "Searching..." : "Search"}
                       </Button>
                     </div>
-                    {/* ... (Search filters omitted for brevity but functionality preserved in performBuddySearch) ... */}
                   </div>
                   {buddySearchResults.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">
@@ -1211,7 +1189,7 @@ const Explore = () => {
               </Card>
             )}
 
-            {/* --- Travel Groups Tab (Restored) --- */}
+            {/* --- Travel Groups Tab --- */}
             {activeTab === "travel-groups" && (
               <>
                 <div className="mb-6 flex justify-between items-center">
