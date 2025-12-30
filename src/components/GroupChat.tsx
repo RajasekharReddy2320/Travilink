@@ -1,26 +1,33 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Plane } from "lucide-react";
-import { GroupTripPlanner } from "./GroupTripPlanner";
-import { supabase } from "@/integrations/supabase/client";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Send, MapPin, Calendar, Trash2, MoreVertical, MessageSquare } from "lucide-react";
+import { format, isToday, isYesterday } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { format, isToday, isYesterday, isSameDay } from "date-fns";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-interface Message {
+interface GroupMessage {
   id: string;
+  group_id: string;
+  user_id: string;
   content: string;
   created_at: string;
   profiles: {
     full_name: string | null;
     avatar_url: string | null;
   };
-  user_id: string;
 }
 
+// Ensure currentUserId is defined here
 interface GroupChatProps {
   groupId: string;
   groupTitle: string;
@@ -30,231 +37,263 @@ interface GroupChatProps {
   travelMode: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  currentUserId: string;
 }
 
-export const GroupChat = ({ groupId, groupTitle, fromLocation, toLocation, travelDate, travelMode, open, onOpenChange }: GroupChatProps) => {
-  const [messages, setMessages] = useState<Message[]>([]);
+export const GroupChat = ({
+  groupId,
+  groupTitle,
+  fromLocation,
+  toLocation,
+  travelDate,
+  open,
+  onOpenChange,
+  currentUserId,
+}: GroupChatProps) => {
+  const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [plannerOpen, setPlannerOpen] = useState(false);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (open) {
-      loadMessages();
-      getCurrentUser();
-      subscribeToMessages();
-    }
-  }, [open, groupId]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const getCurrentUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) setCurrentUserId(user.id);
+  const getDateLabel = (dateString: string) => {
+    const date = new Date(dateString);
+    if (isToday(date)) return "Today";
+    if (isYesterday(date)) return "Yesterday";
+    return format(date, "MMMM d, yyyy");
   };
 
-  const loadMessages = async () => {
-    const { data, error } = await supabase
-      .from("group_messages")
-      .select(`
-        id,
-        content,
-        created_at,
-        user_id,
-        profiles:user_id (full_name, avatar_url)
-      `)
-      .eq("group_id", groupId)
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      console.error("Error loading messages:", error);
-      return;
-    }
-
-    setMessages(data as any);
+  const getInitials = (name: string | null) => {
+    if (!name) return "U";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
   };
 
-  const subscribeToMessages = () => {
+  useEffect(() => {
+    if (!open) return;
+
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from("travel_group_messages")
+        .select(`*, profiles:user_id(full_name, avatar_url)`)
+        .eq("group_id", groupId)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        console.error("Error fetching group messages:", error);
+      } else {
+        setMessages((data as any) || []);
+      }
+    };
+
+    fetchMessages();
+
     const channel = supabase
-      .channel(`group-messages-${groupId}`)
+      .channel(`group-chat-${groupId}`)
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
-          table: "group_messages",
+          table: "travel_group_messages",
           filter: `group_id=eq.${groupId}`,
         },
-        () => loadMessages()
+        async (payload) => {
+          if (payload.eventType === "INSERT") {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("full_name, avatar_url")
+              .eq("id", payload.new.user_id)
+              .single();
+            const newMsg = { ...payload.new, profiles: profile } as GroupMessage;
+            setMessages((prev) => [...prev, newMsg]);
+          } else if (payload.eventType === "DELETE") {
+            setMessages((prev) => prev.filter((m) => m.id !== payload.old.id));
+          }
+        },
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  };
+  }, [groupId, open]);
 
-  const scrollToBottom = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector("[data-radix-scroll-area-viewport]");
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
     }
-  };
+  }, [messages, open]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !currentUserId) return;
+  const handleSend = async () => {
+    if (!newMessage.trim()) return;
 
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.from("group_messages").insert({
-        group_id: groupId,
-        user_id: currentUserId,
-        content: newMessage.trim(),
-      });
+    const { error } = await supabase.from("travel_group_messages").insert({
+      group_id: groupId,
+      user_id: currentUserId,
+      content: newMessage.trim(),
+    });
 
-      if (error) throw error;
-
+    if (error) {
+      toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
+    } else {
       setNewMessage("");
-    } catch (error: any) {
-      toast({
-        title: "Error sending message",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const getInitials = (name: string | null) => {
-    if (!name) return "U";
-    return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
-  };
-
-  const getDateLabel = (date: Date) => {
-    if (isToday(date)) return "Today";
-    if (isYesterday(date)) return "Yesterday";
-    return format(date, "MMMM d, yyyy");
+  const handleDelete = async (messageId: string) => {
+    const { error } = await supabase.from("travel_group_messages").delete().eq("id", messageId);
+    if (error) {
+      toast({ title: "Error", description: "Could not delete message", variant: "destructive" });
+    } else {
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      toast({ title: "Message deleted" });
+    }
   };
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[600px] h-[600px] flex flex-col p-0 gap-0">
-          <DialogHeader className="p-4 border-b">
-            <div className="flex items-center justify-between">
-              <DialogTitle>{groupTitle} - Group Chat</DialogTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPlannerOpen(true)}
-                className="gap-2"
-              >
-                <Plane className="h-4 w-4" />
-                Plan Trip
-              </Button>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md h-[80vh] flex flex-col p-0 gap-0 overflow-hidden border-none shadow-xl">
+        {/* Header */}
+        <div className="border-b px-4 py-3 bg-muted/40 flex items-center justify-between shrink-0">
+          <div className="flex flex-col gap-1 pr-10 min-w-0">
+            <DialogTitle className="text-base font-semibold leading-none truncate">{groupTitle}</DialogTitle>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 truncate">
+              <span className="flex items-center gap-0.5 truncate">
+                <MapPin className="h-3 w-3 shrink-0" /> {fromLocation} to {toLocation}
+              </span>
+              <span className="hidden sm:inline">•</span>
+              <span className="flex items-center gap-0.5 shrink-0">
+                <Calendar className="h-3 w-3 shrink-0" /> {format(new Date(travelDate), "MMM d")}
+              </span>
             </div>
-          </DialogHeader>
-        
-          {/* White background with grey message bubbles */}
-          <ScrollArea 
-            className="flex-1 px-4 bg-background" 
-            ref={scrollRef}
-          >
-            <div className="space-y-4 py-4">
-              {messages.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No messages yet. Start the conversation!
-                </div>
-              ) : (
-                messages.map((message, index) => {
-                  const isOwnMessage = message.user_id === currentUserId;
-                  const messageDate = new Date(message.created_at);
-                  const prevMessage = index > 0 ? messages[index - 1] : null;
-                  const prevDate = prevMessage ? new Date(prevMessage.created_at) : null;
-                  const showDateSeparator = !prevDate || !isSameDay(messageDate, prevDate);
+          </div>
 
-                  return (
-                    <div key={message.id}>
-                      {showDateSeparator && (
-                        <div className="flex items-center justify-center my-4">
-                          <div className="bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground">
-                            {getDateLabel(messageDate)}
-                          </div>
-                        </div>
-                      )}
-                      <div
-                        className={`flex gap-3 ${isOwnMessage ? "flex-row-reverse" : ""}`}
-                      >
-                        <Avatar className="h-8 w-8 border-2 border-muted">
-                          <AvatarImage src={message.profiles.avatar_url || undefined} />
-                          <AvatarFallback className="text-xs bg-muted text-muted-foreground">
-                            {getInitials(message.profiles.full_name)}
+          <div className="flex items-center gap-1 shrink-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem>Group Info</DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive">Leave Group</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {/* Chat Area */}
+        <div className="flex-1 overflow-hidden relative bg-background" ref={scrollAreaRef}>
+          <ScrollArea className="h-full px-4 py-4">
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50 py-10">
+                <MessageSquare className="h-10 w-10 mb-2" />
+                <p className="text-sm">No messages yet.</p>
+                <p className="text-xs">Start the conversation!</p>
+              </div>
+            ) : (
+              messages.map((msg, index) => {
+                const isMe = msg.user_id === currentUserId;
+                const messageDate = new Date(msg.created_at);
+                const prevMessage = index > 0 ? messages[index - 1] : null;
+                const prevDate = prevMessage ? new Date(prevMessage.created_at) : null;
+                const showDateSeparator = !prevDate || messageDate.getDate() !== prevDate.getDate();
+
+                return (
+                  <div key={msg.id}>
+                    {showDateSeparator && (
+                      <div className="flex justify-center my-4">
+                        <span className="bg-muted text-muted-foreground text-[10px] px-2 py-1 rounded-full">
+                          {getDateLabel(msg.created_at)}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className={`flex gap-2 mb-3 ${isMe ? "justify-end" : "justify-start"}`}>
+                      {!isMe && (
+                        <Avatar className="h-8 w-8 mt-1">
+                          <AvatarImage src={msg.profiles?.avatar_url || undefined} />
+                          <AvatarFallback className="text-[10px]">
+                            {getInitials(msg.profiles?.full_name)}
                           </AvatarFallback>
                         </Avatar>
-                        <div className={`flex-1 ${isOwnMessage ? "text-right" : ""}`}>
-                          <div className={`flex items-center gap-2 mb-1 ${isOwnMessage ? "justify-end" : ""}`}>
-                            <span className="text-sm font-medium text-foreground" style={{ fontFamily: "'Outfit', 'Poppins', sans-serif" }}>
-                              {isOwnMessage ? "You" : message.profiles.full_name || "Unknown"}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {format(messageDate, "HH:mm")}
-                            </span>
-                          </div>
-                          <div
-                            className={`inline-block p-3 rounded-2xl max-w-[80%] ${
-                              isOwnMessage
-                                ? "bg-primary text-primary-foreground rounded-tr-sm"
-                                : "bg-muted text-foreground rounded-tl-sm"
+                      )}
+
+                      <div className={`flex flex-col max-w-[75%] group ${isMe ? "items-end" : "items-start"}`}>
+                        {!isMe && (
+                          <span className="text-[10px] text-muted-foreground ml-1 mb-0.5">
+                            {msg.profiles?.full_name || "Unknown"}
+                          </span>
+                        )}
+
+                        <div
+                          className={`relative px-3 py-2 text-sm shadow-sm
+                            ${
+                              isMe
+                                ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-none"
+                                : "bg-secondary text-secondary-foreground rounded-2xl rounded-tl-none"
                             }`}
+                        >
+                          <p className="whitespace-pre-wrap break-words leading-snug">{msg.content}</p>
+
+                          <div
+                            className={`flex items-center justify-end gap-1 mt-1 ${isMe ? "text-primary-foreground/70" : "text-muted-foreground"}`}
                           >
-                            <p 
-                              className="text-sm whitespace-pre-wrap break-words"
-                              style={{ fontFamily: "'Outfit', 'Poppins', sans-serif" }}
-                            >
-                              {message.content}
-                            </p>
+                            <span className="text-[10px]">{format(messageDate, "h:mm a")}</span>
                           </div>
+
+                          {/* Unsend */}
+                          {isMe && (
+                            <div className="absolute -left-8 top-0 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                onClick={() => handleDelete(msg.id)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
+                  </div>
+                );
+              })
+            )}
           </ScrollArea>
+        </div>
 
-          <form onSubmit={handleSendMessage} className="flex gap-2 p-4 border-t bg-background">
+        {/* Input Area */}
+        <div className="p-3 border-t bg-background shrink-0">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSend();
+            }}
+            className="flex gap-2 items-end"
+          >
             <Input
+              placeholder="Message group..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type your message..."
-              disabled={isLoading}
-              className="flex-1"
-              style={{ fontFamily: "'Outfit', 'Poppins', sans-serif" }}
+              className="rounded-full min-h-[44px] py-3"
             />
-            <Button type="submit" size="icon" disabled={isLoading || !newMessage.trim()}>
-              <Send className="h-4 w-4" />
+            <Button type="submit" size="icon" className="rounded-full h-11 w-11 shrink-0" disabled={!newMessage.trim()}>
+              <Send className="h-5 w-5 ml-0.5" />
             </Button>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      <GroupTripPlanner
-        groupId={groupId}
-        groupTitle={groupTitle}
-        fromLocation={fromLocation}
-        toLocation={toLocation}
-        travelDate={travelDate}
-        travelMode={travelMode}
-        open={plannerOpen}
-        onOpenChange={setPlannerOpen}
-      />
-    </>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };

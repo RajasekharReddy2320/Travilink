@@ -3,7 +3,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Users, MapPin, Calendar, Plane, Train, Bus, MessageCircle, Trash2 } from "lucide-react";
+import { Users, MapPin, Calendar, Plane, Train, Bus, MessageSquare, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +18,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { GroupChat } from "./GroupChat"; // Ensure this imports the new component above
+import { GroupChat } from "./GroupChat";
 
 interface TravelGroupCardProps {
   group: {
@@ -113,7 +113,7 @@ export const TravelGroupCard = ({ group, currentUserId, isMember, onUpdate }: Tr
 
   return (
     <>
-      <Card className="h-full flex flex-col">
+      <Card className="h-full flex flex-col hover:shadow-md transition-shadow">
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0 pr-2">
@@ -197,7 +197,6 @@ export const TravelGroupCard = ({ group, currentUserId, isMember, onUpdate }: Tr
         </CardFooter>
       </Card>
 
-      {/* Group Chat Dialog - Rendered outside the card layout flow via Portal but logically here */}
       <GroupChat
         groupId={group.id}
         groupTitle={group.title}
