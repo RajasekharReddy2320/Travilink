@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { User, Mail, Phone, MapPin, Globe, Calendar, LogOut, MessageCircle, UserPlus, UserCheck, UserMinus, Lock, Unlock, X, Star, FileText, Users as UsersIcon, Ticket, Camera, BookOpen, Grid3X3, Settings, ChevronRight, Bookmark, Clock, CheckCircle, XCircle, Wallet, History, Shield } from "lucide-react";
 import { SecureVault } from "@/components/SecureVault";
 import DashboardNav from "@/components/DashboardNav";
+import ProfileSidebar from "@/components/ProfileSidebar";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { z } from "zod";
@@ -447,9 +448,13 @@ const Profile = () => {
   if (!profile) return null;
   return <div className="min-h-screen bg-background">
       <DashboardNav />
+      <ProfileSidebar 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
+        isOwnProfile={isOwnProfile} 
+      />
 
-
-      <main className="max-w-4xl mx-auto pb-20">
+      <main className="max-w-4xl mx-auto pb-20 md:ml-16 lg:ml-64 transition-all duration-300">
         {/* Instagram-style Profile Header */}
         <div className="relative">
           {/* Cover/Gradient Background */}
@@ -586,34 +591,28 @@ const Profile = () => {
         {/* Content Tabs */}
         <div className="px-4 md:px-8 mt-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className={`w-full grid ${isOwnProfile ? 'grid-cols-7' : 'grid-cols-4'} bg-muted/50 rounded-xl p-1`}>
+            {/* Mobile-only TabsList - Hidden on desktop as sidebar handles navigation */}
+            <TabsList className={`w-full grid ${isOwnProfile ? 'grid-cols-7' : 'grid-cols-4'} bg-muted/50 rounded-xl p-1 md:hidden`}>
               <TabsTrigger value="posts" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <Grid3X3 className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Posts</span>
+                <Grid3X3 className="h-4 w-4" />
               </TabsTrigger>
               <TabsTrigger value="trips" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <Globe className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Trips</span>
+                <Globe className="h-4 w-4" />
               </TabsTrigger>
               <TabsTrigger value="groups" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <UsersIcon className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Groups</span>
+                <UsersIcon className="h-4 w-4" />
               </TabsTrigger>
               <TabsTrigger value="bookings" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <Ticket className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Tickets</span>
+                <Ticket className="h-4 w-4" />
               </TabsTrigger>
               {isOwnProfile && <TabsTrigger value="history" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                  <History className="h-4 w-4 md:mr-2" />
-                  <span className="hidden md:inline">History</span>
+                  <History className="h-4 w-4" />
                 </TabsTrigger>}
               {isOwnProfile && <TabsTrigger value="saved" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                  <Bookmark className="h-4 w-4 md:mr-2" />
-                  <span className="hidden md:inline">Saved</span>
+                  <Bookmark className="h-4 w-4" />
                 </TabsTrigger>}
               {isOwnProfile && <TabsTrigger value="vault" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                  <Shield className="h-4 w-4 md:mr-2" />
-                  <span className="hidden md:inline">Vault</span>
+                  <Shield className="h-4 w-4" />
                 </TabsTrigger>}
             </TabsList>
 
