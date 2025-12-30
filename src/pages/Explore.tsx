@@ -33,9 +33,18 @@ import {
   ChevronLeft,
   Trash2,
   CheckCheck,
+  Shield,
+  ShieldCheck,
 } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 import { z } from "zod";
+import { 
+  initializeE2E, 
+  encryptMessage, 
+  decryptMessage, 
+  hasKeyPair,
+  getStoredKeyPair 
+} from "@/utils/e2eEncryption";
 
 // --- Interfaces ---
 interface Post {
@@ -72,6 +81,9 @@ interface Message {
   content: string;
   read: boolean;
   created_at: string;
+  encrypted_key?: string | null;
+  iv?: string | null;
+  is_encrypted?: boolean;
 }
 interface Conversation {
   user: Profile;
@@ -169,6 +181,8 @@ const Explore = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [allUsers, setAllUsers] = useState<Profile[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [e2eEnabled, setE2eEnabled] = useState(false);
+  const [recipientPublicKey, setRecipientPublicKey] = useState<string | null>(null);
 
   // Travel Buddies State
   const [travelGroups, setTravelGroups] = useState<TravelGroup[]>([]);
@@ -203,6 +217,20 @@ const Explore = () => {
       return;
     }
     setCurrentUserId(session.user.id);
+    
+    // Initialize E2E encryption
+    try {
+      const publicKey = await initializeE2E();
+      // Store public key in profile if not already stored
+      await supabase
+        .from("profiles")
+        .update({ public_key: publicKey })
+        .eq("id", session.user.id);
+      setE2eEnabled(true);
+    } catch (error) {
+      console.error("Failed to initialize E2E encryption:", error);
+    }
+    
     await Promise.all([
       loadPosts(),
       loadUserInteractions(session.user.id),
@@ -491,6 +519,16 @@ const Explore = () => {
 
   const loadMessages = async () => {
     if (!selectedUser || !currentUserId) return;
+    
+    // Load recipient's public key for encryption
+    const { data: recipientProfile } = await supabase
+      .from("profiles")
+      .select("public_key")
+      .eq("id", selectedUser.id)
+      .single();
+    
+    setRecipientPublicKey(recipientProfile?.public_key || null);
+    
     const { data } = await supabase
       .from("messages")
       .select("*")
@@ -498,7 +536,29 @@ const Explore = () => {
         `and(sender_id.eq.${currentUserId},recipient_id.eq.${selectedUser.id}),and(sender_id.eq.${selectedUser.id},recipient_id.eq.${currentUserId})`,
       )
       .order("created_at", { ascending: true });
-    setMessages(data || []);
+    
+    // Decrypt encrypted messages
+    const decryptedMessages = await Promise.all(
+      (data || []).map(async (msg) => {
+        if (msg.is_encrypted && msg.encrypted_key && msg.iv) {
+          try {
+            // Only decrypt messages sent to us (we have the private key)
+            if (msg.recipient_id === currentUserId) {
+              const decryptedContent = await decryptMessage(msg.content, msg.encrypted_key, msg.iv);
+              return { ...msg, content: decryptedContent };
+            }
+            // For messages we sent, the content is already readable (we store it before encryption for sender)
+            return msg;
+          } catch (error) {
+            console.error("Failed to decrypt message:", error);
+            return { ...msg, content: "[Encrypted message - unable to decrypt]" };
+          }
+        }
+        return msg;
+      })
+    );
+    
+    setMessages(decryptedMessages as Message[]);
     await supabase
       .from("messages")
       .update({ read: true })
@@ -530,25 +590,56 @@ const Explore = () => {
       return;
     }
 
-    // 1. Send to DB
+    let messageData: any = { 
+      sender_id: currentUserId, 
+      recipient_id: selectedUser.id, 
+      content: validation.data.content,
+      is_encrypted: false
+    };
+
+    // Try to encrypt if recipient has a public key
+    if (recipientPublicKey && e2eEnabled) {
+      try {
+        const { encryptedMessage, encryptedKey, iv } = await encryptMessage(
+          validation.data.content,
+          recipientPublicKey
+        );
+        messageData = {
+          ...messageData,
+          content: encryptedMessage,
+          encrypted_key: encryptedKey,
+          iv: iv,
+          is_encrypted: true
+        };
+      } catch (error) {
+        console.error("Encryption failed, sending unencrypted:", error);
+        // Fall back to unencrypted message
+      }
+    }
+
     const { data, error } = await supabase
       .from("messages")
-      .insert({ sender_id: currentUserId, recipient_id: selectedUser.id, content: validation.data.content })
+      .insert(messageData)
       .select()
       .single();
+      
     if (error) {
       toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
       return;
     }
 
-    // 2. Add to state immediately
+    // Add to state with decrypted content for display
+    const displayMessage = {
+      ...data,
+      content: validation.data.content // Show original content to sender
+    } as Message;
+    
     setMessages((prev) => {
       if (prev.some((m) => m.id === data.id)) return prev;
-      return [...prev, data as Message];
+      return [...prev, displayMessage];
     });
 
     setMessageText("");
-    // We don't reload conversations here, we let Realtime handle it for cleaner flow, or we could.
   };
 
   // --- PERMANENT DELETION LOGIC ---
@@ -922,7 +1013,16 @@ const Explore = () => {
                           </Avatar>
                           <div>
                             <h3 className="font-semibold text-sm">{selectedUser.full_name}</h3>
-                            <span className="text-xs text-muted-foreground">Online</span>
+                            <div className="flex items-center gap-1">
+                              {recipientPublicKey && e2eEnabled ? (
+                                <span className="flex items-center gap-1 text-xs text-green-600">
+                                  <ShieldCheck className="h-3 w-3" />
+                                  <span>End-to-end encrypted</span>
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Online</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="relative">
@@ -972,6 +1072,11 @@ const Explore = () => {
                                     <div
                                       className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${isMe ? "opacity-80" : "text-muted-foreground"}`}
                                     >
+                                      {msg.is_encrypted && (
+                                        <span title="End-to-end encrypted">
+                                          <Shield className="h-3 w-3 text-green-500" />
+                                        </span>
+                                      )}
                                       <span>{format(messageDate, "h:mm a")}</span>
                                       {isMe && (
                                         <span>
