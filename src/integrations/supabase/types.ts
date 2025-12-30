@@ -222,7 +222,10 @@ export type Database = {
         Row: {
           content: string
           created_at: string
+          encrypted_key: string | null
           id: string
+          is_encrypted: boolean | null
+          iv: string | null
           read: boolean | null
           read_at: string | null
           recipient_id: string
@@ -231,7 +234,10 @@ export type Database = {
         Insert: {
           content: string
           created_at?: string
+          encrypted_key?: string | null
           id?: string
+          is_encrypted?: boolean | null
+          iv?: string | null
           read?: boolean | null
           read_at?: string | null
           recipient_id: string
@@ -240,7 +246,10 @@ export type Database = {
         Update: {
           content?: string
           created_at?: string
+          encrypted_key?: string | null
           id?: string
+          is_encrypted?: boolean | null
+          iv?: string | null
           read?: boolean | null
           read_at?: string | null
           recipient_id?: string
@@ -487,6 +496,7 @@ export type Database = {
           languages_spoken: string[] | null
           onboarding_completed: boolean | null
           phone: string | null
+          public_key: string | null
           state: string | null
           travel_preferences: string[] | null
           updated_at: string | null
@@ -509,6 +519,7 @@ export type Database = {
           languages_spoken?: string[] | null
           onboarding_completed?: boolean | null
           phone?: string | null
+          public_key?: string | null
           state?: string | null
           travel_preferences?: string[] | null
           updated_at?: string | null
@@ -531,6 +542,7 @@ export type Database = {
           languages_spoken?: string[] | null
           onboarding_completed?: boolean | null
           phone?: string | null
+          public_key?: string | null
           state?: string | null
           travel_preferences?: string[] | null
           updated_at?: string | null
