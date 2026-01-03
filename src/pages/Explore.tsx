@@ -35,6 +35,7 @@ import {
   CheckCheck,
   Shield,
   ShieldCheck,
+  PenSquare,
 } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 import { z } from "zod";
@@ -155,8 +156,10 @@ const Explore = () => {
   const { tab } = useParams<{ tab?: string }>();
   const { toast } = useToast();
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [isScrollingDown, setIsScrollingDown] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("feed");
@@ -195,7 +198,29 @@ const Explore = () => {
   const [buddySearchResults, setBuddySearchResults] = useState<BuddySearchResult[]>([]);
   const [buddySearchLoading, setBuddySearchLoading] = useState(false);
 
-  // Auto-hide sidebar on mouse move
+  // Auto-hide sidebar on scroll and mouse move
+  const handleScroll = useCallback(() => {
+    const currentScrollY = window.scrollY;
+    
+    if (currentScrollY < 50) {
+      // At top, show sidebar
+      setIsSidebarOpen(true);
+      setIsScrollingDown(false);
+    } else if (currentScrollY > lastScrollY && currentScrollY > 100) {
+      // Scrolling down - hide sidebar
+      setIsScrollingDown(true);
+      if (!isSidebarHovered) {
+        setIsSidebarOpen(false);
+      }
+    } else if (currentScrollY < lastScrollY) {
+      // Scrolling up - show sidebar
+      setIsScrollingDown(false);
+      setIsSidebarOpen(true);
+    }
+    
+    setLastScrollY(currentScrollY);
+  }, [lastScrollY, isSidebarHovered]);
+
   const handleMouseMove = useCallback((e: MouseEvent) => {
     const isNearLeftEdge = e.clientX <= 60;
     if (isNearLeftEdge && !isSidebarOpen) {
@@ -204,9 +229,13 @@ const Explore = () => {
   }, [isSidebarOpen]);
 
   useEffect(() => {
+    window.addEventListener("scroll", handleScroll, { passive: true });
     window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [handleMouseMove]);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("mousemove", handleMouseMove);
+    };
+  }, [handleScroll, handleMouseMove]);
 
   // Close sidebar when mouse leaves and not hovered
   useEffect(() => {
@@ -804,7 +833,7 @@ const Explore = () => {
 
   // Check if we're in messages tab for fullscreen layout
   const isMessagesTab = activeTab === "messages";
-  const sidebarVisible = isSidebarOpen || isSidebarHovered || !isMessagesTab;
+  const sidebarVisible = isSidebarOpen || isSidebarHovered;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -870,16 +899,30 @@ const Explore = () => {
                 </button>
               );
             })}
+            
+            {/* Create Post Button */}
+            <div className="mt-4 pt-4 border-t border-border">
+              <CreatePostDialog 
+                onPostCreated={handlePostUpdate}
+                trigger={
+                  <button
+                    className="flex items-center transition-all duration-200 rounded-lg group relative w-full px-3 py-2.5 gap-3 bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    <PenSquare className="h-5 w-5 shrink-0" />
+                    <span className="font-medium text-sm">Create Post</span>
+                  </button>
+                }
+              />
+            </div>
           </div>
         </aside>
 
         {/* MAIN CONTENT */}
         <main className={`flex-1 min-w-0 ${isMessagesTab ? 'px-0' : 'px-4 py-6'}`}>
-          {!isMessagesTab && (
+          {!isMessagesTab && activeTab === "feed" && (
             <div className="mx-auto max-w-4xl">
               <div className="flex items-center justify-between mb-6">
                 <h1 className="text-3xl font-bold">Tramigos</h1>
-                <CreatePostDialog onPostCreated={handlePostUpdate} />
               </div>
             </div>
           )}

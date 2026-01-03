@@ -23,7 +23,12 @@ interface SavedTrip {
   planner_mode: string | null;
 }
 
-export const CreatePostDialog = ({ onPostCreated }: { onPostCreated: () => void }) => {
+interface CreatePostDialogProps {
+  onPostCreated: () => void;
+  trigger?: React.ReactNode;
+}
+
+export const CreatePostDialog = ({ onPostCreated, trigger }: CreatePostDialogProps) => {
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -187,10 +192,12 @@ export const CreatePostDialog = ({ onPostCreated }: { onPostCreated: () => void 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
-          <PlusCircle className="h-4 w-4" />
-          Create Post
-        </Button>
+        {trigger || (
+          <Button className="gap-2">
+            <PlusCircle className="h-4 w-4" />
+            Create Post
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[525px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
