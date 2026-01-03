@@ -334,7 +334,7 @@ const PlannerV2 = () => {
       </Dialog>
 
       <main className="pb-20">
-        <div className="max-w-5xl mx-auto px-6 py-10">
+        <div className="max-w-7xl mx-auto px-6 py-10">
           {/* Intro Text */}
           {!tripData && !isLoading && (
             <div className="text-center mb-10 space-y-4 max-w-2xl mx-auto">
@@ -408,30 +408,38 @@ const PlannerV2 = () => {
                 </div>
               </div>
 
-              {/* Interactive Map with all stops */}
-              <ItineraryMap steps={tripData.steps} />
-
-              {/* Timeline Connector Line (Visual) */}
-              <div className="relative">
-                <div className="absolute left-[50%] top-0 bottom-0 w-px bg-border hidden md:block -z-10 transform -translate-x-1/2"></div>
-                
-                {/* Steps */}
-                <div className="space-y-6 relative z-10">
-                  {tripData.steps.map((step) => (
-                    <ItineraryCard
-                      key={step.id}
-                      step={step}
-                      onAdd={handleAddToCart}
-                      isAdded={cartItems.some(item => item.id === step.id)}
-                    />
-                  ))}
+              {/* Map on Left, Itinerary on Right Layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Map Section - Left Side */}
+                <div className="lg:sticky lg:top-24 lg:h-[calc(100vh-8rem)]">
+                  <ItineraryMap steps={tripData.steps} />
                 </div>
-              </div>
 
-              {/* Completion Message */}
-              <div className="text-center mt-16 pb-10">
-                <p className="text-muted-foreground text-sm">End of Itinerary</p>
-                <div className="w-2 h-2 bg-muted-foreground/50 rounded-full mx-auto mt-2"></div>
+                {/* Itinerary Section - Right Side */}
+                <div className="space-y-6">
+                  {/* Timeline Connector Line (Visual) */}
+                  <div className="relative">
+                    <div className="absolute left-4 top-0 bottom-0 w-px bg-border hidden md:block -z-10"></div>
+                    
+                    {/* Steps */}
+                    <div className="space-y-6 relative z-10">
+                      {tripData.steps.map((step) => (
+                        <ItineraryCard
+                          key={step.id}
+                          step={step}
+                          onAdd={handleAddToCart}
+                          isAdded={cartItems.some(item => item.id === step.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Completion Message */}
+                  <div className="text-center mt-8 pb-10">
+                    <p className="text-muted-foreground text-sm">End of Itinerary</p>
+                    <div className="w-2 h-2 bg-muted-foreground/50 rounded-full mx-auto mt-2"></div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

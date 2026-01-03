@@ -14,7 +14,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
-import PlanTrip from "./pages/PlanTrip";
+
 import PlannerV2 from "./pages/PlannerV2";
 import Book from "./pages/Book";
 import Profile from "./pages/Profile";
@@ -60,8 +60,7 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/onboarding" element={<Onboarding />} />
-              <Route path="/plan-trip" element={<Dashboard />} />
-              <Route path="/ai-planner" element={<PlanTrip />} />
+              <Route path="/plan-trip" element={<PlannerV2 />} />
               <Route path="/planner" element={<PlannerV2 />} />
               <Route path="/generated-itineraries" element={<GeneratedItineraries />} />
               <Route path="/create-trip" element={<CreateTrip />} />
