@@ -19,8 +19,14 @@ const MobileBottomNav = () => {
     return location.pathname.startsWith(path);
   };
 
+  // Calculate height with safe area
+  const navHeight = "calc(4rem + env(safe-area-inset-bottom, 0px))";
+
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-t border-border safe-area-inset-bottom">
+    <nav 
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-t border-border"
+      style={{ height: navHeight }}
+    >
       <div className="flex items-center justify-around h-16 px-2">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -43,6 +49,8 @@ const MobileBottomNav = () => {
           );
         })}
       </div>
+      {/* Safe area spacer */}
+      <div className="safe-area-inset-bottom" />
     </nav>
   );
 };

@@ -118,10 +118,15 @@ Bluish-Grey, White, Black palette
     padding-top: env(safe-area-inset-top, 0px);
   }
 
-  /* Mobile bottom nav spacing */
+  /* Mobile bottom nav spacing - account for nav height + safe area */
   @media (max-width: 768px) {
     main, .main-content {
-      padding-bottom: 5rem !important;
+      padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px)) !important;
+    }
+    
+    /* Extra padding for pages with floating buttons */
+    .has-floating-button {
+      padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px)) !important;
     }
   }
 

@@ -171,19 +171,17 @@ const HorizontalScrollFeatures = () => {
 
   return (
     <section id="features" ref={containerRef as any} className="relative h-screen -mb-px" aria-label="TraviLink features">
-      {/* --- UNIFIED NAVIGATION DOCK --- 
-        Combines Progress Bar + Navigation Buttons + Motion Toggle
-      */}
+      {/* --- UNIFIED NAVIGATION DOCK (Desktop only) --- */}
       <div
-        className="fixed bottom-8 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-auto z-50 transition-all duration-500 ease-out"
+        className="hidden md:block fixed bottom-8 left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ease-out"
         style={{
           opacity: locked ? 1 : 0,
           pointerEvents: locked ? "auto" : "none",
-          transform: locked ? "translate(-50%, 0)" : "translate(-50%, 20px)",
+          transform: locked ? "translateX(-50%) translateY(0)" : "translateX(-50%) translateY(20px)",
         }}
       >
-        <div className="bg-card/90 backdrop-blur-2xl rounded-2xl shadow-2xl border border-border/50 overflow-hidden flex flex-col w-full md:min-w-[600px]">
-          {/* 1. Integrated Progress Line (Top Edge of Dock) */}
+        <div className="bg-card/90 backdrop-blur-2xl rounded-2xl shadow-2xl border border-border/50 overflow-hidden flex flex-col min-w-[600px]">
+          {/* Progress Line */}
           <div className="h-1 w-full bg-muted/50">
             <div
               className={`h-full bg-gradient-to-r ${features[activeIndex]?.gradient || "from-primary to-accent"}`}
@@ -194,17 +192,17 @@ const HorizontalScrollFeatures = () => {
             />
           </div>
 
-          {/* 2. Controls Area */}
-          <div className="flex items-center p-2 gap-2 overflow-x-auto scrollbar-hide">
+          {/* Controls Area */}
+          <div className="flex items-center p-2 gap-2">
             {/* Counter */}
-            <div className="hidden md:flex items-center px-3 text-xs font-mono font-medium text-muted-foreground border-r mr-1">
+            <div className="flex items-center px-3 text-xs font-mono font-medium text-muted-foreground border-r mr-1">
               <span className="text-foreground text-sm">{activeIndex + 1}</span>
               <span className="mx-1">/</span>
               <span>{features.length}</span>
             </div>
 
             {/* Horizontal Buttons List */}
-            <div className="flex flex-1 gap-2 items-center justify-center md:justify-start">
+            <div className="flex flex-1 gap-2 items-center">
               {features.map((feature, idx) => {
                 const isActive = activeIndex === idx;
                 return (
@@ -228,7 +226,7 @@ const HorizontalScrollFeatures = () => {
                       {feature.emoji}
                     </div>
 
-                    {/* Only show text for the active item to save space */}
+                    {/* Only show text for the active item */}
                     <div
                       className={`
                         overflow-hidden transition-all duration-300 ease-in-out
@@ -247,9 +245,33 @@ const HorizontalScrollFeatures = () => {
             </div>
 
             {/* Divider & Toggle */}
-            <div className="h-6 w-px bg-border mx-1 hidden md:block" />
+            <div className="h-6 w-px bg-border mx-1" />
             <ReduceMotionToggle compact className="shrink-0" />
           </div>
+        </div>
+      </div>
+
+      {/* Mobile Simple Dots Navigation */}
+      <div
+        className="md:hidden fixed bottom-24 left-1/2 -translate-x-1/2 z-50 transition-all duration-300"
+        style={{
+          opacity: locked ? 1 : 0,
+          pointerEvents: locked ? "auto" : "none",
+        }}
+      >
+        <div className="flex items-center gap-2 bg-card/80 backdrop-blur-lg rounded-full px-3 py-2 shadow-lg border border-border/50">
+          {features.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => {
+                setProgress(idx);
+                setActiveIndex(idx);
+              }}
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                activeIndex === idx ? "bg-primary w-6" : "bg-muted-foreground/40"
+              }`}
+            />
+          ))}
         </div>
       </div>
 
