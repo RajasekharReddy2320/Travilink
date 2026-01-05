@@ -198,30 +198,24 @@ const Explore = () => {
   const [buddySearchResults, setBuddySearchResults] = useState<BuddySearchResult[]>([]);
   const [buddySearchLoading, setBuddySearchLoading] = useState(false);
 
-  // Auto-hide sidebar on scroll and mouse move
+  // Auto-open sidebar only when at the very top of the page
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
     
-    if (currentScrollY < 50) {
-      // At top, show sidebar
-      setIsSidebarOpen(true);
-      setIsScrollingDown(false);
-    } else if (currentScrollY > lastScrollY && currentScrollY > 100) {
-      // Scrolling down - hide sidebar
-      setIsScrollingDown(true);
-      if (!isSidebarHovered) {
-        setIsSidebarOpen(false);
-      }
-    } else if (currentScrollY < lastScrollY) {
-      // Scrolling up - show sidebar
-      setIsScrollingDown(false);
+    // Only auto-open sidebar when user is at the very top (scrollY < 10)
+    if (currentScrollY < 10 && !isSidebarOpen) {
       setIsSidebarOpen(true);
     }
     
     setLastScrollY(currentScrollY);
-  }, [lastScrollY, isSidebarHovered]);
+    setIsScrollingDown(currentScrollY > lastScrollY);
+  }, [lastScrollY, isSidebarOpen]);
 
+  // Desktop: Mouse near left edge reveals sidebar
   const handleMouseMove = useCallback((e: MouseEvent) => {
+    // Only on desktop
+    if (window.innerWidth < 768) return;
+    
     const isNearLeftEdge = e.clientX <= 60;
     if (isNearLeftEdge && !isSidebarOpen) {
       setIsSidebarOpen(true);
@@ -237,19 +231,12 @@ const Explore = () => {
     };
   }, [handleScroll, handleMouseMove]);
 
-  // On messages tab, start with sidebar closed on mobile to maximize chat space
+  // Start with sidebar closed on mobile for messages tab
   useEffect(() => {
-    if (activeTab === "messages") {
-      // Don't auto-hide on messages - let user control it
-      return;
+    if (activeTab === "messages" && window.innerWidth < 768) {
+      setIsSidebarOpen(false);
     }
-    if (!isSidebarHovered && isSidebarOpen && isScrollingDown) {
-      const timer = setTimeout(() => {
-        setIsSidebarOpen(false);
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isSidebarHovered, isSidebarOpen, isScrollingDown, activeTab]);
+  }, [activeTab]);
 
   useEffect(() => {
     if (tab && VALID_TABS.includes(tab as TabType)) {
@@ -846,10 +833,11 @@ const Explore = () => {
 
       {/* Main Container */}
       <div className="flex flex-1 relative">
-        {/* Mobile Menu Button - Fixed position */}
+        {/* Mobile Menu Button - Positioned above bottom nav */}
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="fixed bottom-4 left-4 z-50 md:hidden bg-primary text-primary-foreground p-3 rounded-full shadow-lg"
+          className="fixed bottom-20 left-4 z-50 md:hidden bg-primary text-primary-foreground p-3 rounded-full shadow-lg"
+          style={{ bottom: "calc(5rem + env(safe-area-inset-bottom, 0px))" }}
         >
           {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
