@@ -23,18 +23,50 @@ serve(async (req) => {
     const endDateObj = new Date(endDate);
     const numDays = Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-    const systemPrompt = `You are a travel planning AI. Generate detailed trip itineraries in JSON format.
-Return ONLY valid JSON with no additional text. The response must be a valid JSON object.`;
+    const systemPrompt = `You are an expert travel planning AI with deep knowledge of Indian transportation systems, including:
+- Major airlines (IndiGo, Air India, SpiceJet, Vistara, AirAsia India, Akasa Air, etc.)
+- Indian Railways train routes, train numbers, and station codes
+- Interstate bus services and operators
+- Accurate pricing for January 2026
+
+You MUST provide REAL and ACCURATE:
+- Flight numbers (e.g., 6E 2341, AI 505, SG 8169)
+- Train numbers and names (e.g., 12841 Coromandel Express, 22691 Rajdhani Express)
+- Actual airport codes (e.g., CCU for Kolkata, BLR for Bangalore, DEL for Delhi, BOM for Mumbai, HYD for Hyderabad, IXR for Ranchi)
+- Real railway station names and codes (e.g., RNCH for Ranchi, SBC for Bangalore City, HWH for Howrah)
+- Accurate departure and arrival times based on typical schedules
+- Realistic 2026 prices in INR
+
+Return ONLY valid JSON with no additional text.`;
 
     const userPrompt = `Create a ${numDays}-day trip itinerary for ${travelers} traveler(s) traveling from ${currentLocation} to ${destination}.
-Departure city: ${currentLocation}
-Destination: ${destination}
-Budget level: ${budget}
-Interests: ${interests.join(", ")}
-Travel dates: ${startDate} to ${endDate}
 
-IMPORTANT: The first step should be the transport (flight/train/bus) FROM ${currentLocation} TO ${destination}. Include specific departure station/airport in ${currentLocation} and arrival station/airport in ${destination}.
-The last step should be the return transport FROM ${destination} TO ${currentLocation}.
+TRIP DETAILS:
+- Departure city: ${currentLocation}
+- Destination: ${destination}
+- Budget: ₹${budget} INR (total for all travelers)
+- Interests: ${interests.join(", ")}
+- Travel dates: ${startDate} to ${endDate}
+- Number of travelers: ${travelers}
+
+CRITICAL TRANSPORT REQUIREMENTS:
+1. FIRST STEP: Outbound transport FROM ${currentLocation} TO ${destination}
+   - Research and provide REAL flight numbers (like 6E 2341, AI 505) or train numbers (like 12841, 22691)
+   - Include actual departure airport/station in ${currentLocation} with correct codes
+   - Include actual arrival airport/station in ${destination} with correct codes
+   - Provide realistic departure and arrival times
+   - Use accurate 2026 pricing
+
+2. LAST STEP: Return transport FROM ${destination} TO ${currentLocation}
+   - Same accuracy requirements as outbound
+
+3. For flights: Use format "IndiGo 6E 2341" or "Air India AI 505"
+4. For trains: Use format "12841 Coromandel Express" or "22691 Rajdhani Express"
+
+LOCATION REQUIREMENTS:
+- Use EXACT location names for all activities (e.g., "Lalbagh Botanical Garden, Mavalli, Bangalore" not just "Garden")
+- Include precise GPS coordinates (latitude, longitude) for each location
+- For restaurants, use real restaurant names with addresses
 
 Return a JSON object with this exact structure:
 {
@@ -45,21 +77,22 @@ Return a JSON object with this exact structure:
       "id": "unique-id-1",
       "day": 1,
       "time": "09:00",
-      "title": "Activity title",
-      "description": "Brief description of the activity",
-      "location": "Specific location name",
-      "coordinates": { "lat": 0.0, "lng": 0.0 },
-      "duration": "2 hours",
-      "category": "activity",
+      "title": "IndiGo Flight 6E 2341 to Bangalore",
+      "description": "Direct flight from Ranchi Airport (IXR) to Kempegowda International Airport (BLR). Departure: 09:00, Arrival: 11:30",
+      "location": "Birsa Munda Airport, Ranchi (IXR)",
+      "coordinates": { "lat": 23.3143, "lng": 85.3217 },
+      "duration": "2h 30m",
+      "category": "transport",
       "isBookable": true,
-      "estimatedCost": 2000
+      "estimatedCost": 4500
     }
   ]
 }
 
-Categories must be one of: transport, accommodation, activity, food, sightseeing
-Include 4-6 steps per day. Use realistic costs in INR.
-Make sure each step has a unique id.`;
+Categories: transport, accommodation, activity, food, sightseeing
+Include 4-6 steps per day with accurate timings.
+All costs must be realistic 2026 prices in INR.
+Each step must have a unique id.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
