@@ -83,28 +83,49 @@ function getAirportCode(city: string): string {
   return normalized.slice(0, 3).toUpperCase();
 }
 
-// Get Amadeus access token
-async function getAmadeusToken(apiKey: string, apiSecret: string): Promise<string> {
-  const response = await fetch('https://api.amadeus.com/v1/security/oauth2/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: `grant_type=client_credentials&client_id=${apiKey}&client_secret=${apiSecret}`,
-  });
+// Get Amadeus access token + the host it belongs to (production vs sandbox)
+async function getAmadeusToken(
+  apiKey: string,
+  apiSecret: string
+): Promise<{ token: string; host: 'api.amadeus.com' | 'test.api.amadeus.com' }> {
+  const requestToken = async (host: 'api.amadeus.com' | 'test.api.amadeus.com') => {
+    const body = new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: apiKey,
+      client_secret: apiSecret,
+    }).toString();
 
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('[Amadeus Auth Error]', error);
-    throw new Error('Failed to authenticate with Amadeus');
-  }
+    const response = await fetch(`https://${host}/v1/security/oauth2/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body,
+    });
 
-  const data = await response.json();
-  return data.access_token;
+    const text = await response.text();
+    if (!response.ok) {
+      console.error('[Amadeus Auth Error]', { host, error: text });
+      return { ok: false as const };
+    }
+
+    const data = JSON.parse(text);
+    return { ok: true as const, token: data.access_token as string };
+  };
+
+  const prod = await requestToken('api.amadeus.com');
+  if (prod.ok) return { token: prod.token, host: 'api.amadeus.com' };
+
+  const sandbox = await requestToken('test.api.amadeus.com');
+  if (sandbox.ok) return { token: sandbox.token, host: 'test.api.amadeus.com' };
+
+  throw new Error('Failed to authenticate with Amadeus');
 }
 
 // Search flights using Amadeus API
 async function searchFlightsAmadeus(
+  host: 'api.amadeus.com' | 'test.api.amadeus.com',
   token: string,
   origin: string,
   destination: string,
@@ -121,7 +142,7 @@ async function searchFlightsAmadeus(
   });
 
   const response = await fetch(
-    `https://api.amadeus.com/v2/shopping/flight-offers?${params}`,
+    `https://${host}/v2/shopping/flight-offers?${params}`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -236,11 +257,12 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     });
 
-    // Get Amadeus token
-    const token = await getAmadeusToken(apiKey, apiSecret);
+    // Get Amadeus token (and the correct API host for that token)
+    const { token, host } = await getAmadeusToken(apiKey, apiSecret);
 
     // Search flights
     const amadeusData = await searchFlightsAmadeus(
+      host,
       token,
       originCode,
       destinationCode,
